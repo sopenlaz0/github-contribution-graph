@@ -134,11 +134,18 @@ struct MenuBarView: View {
 
             Spacer()
 
-            yearDropdown
+            yearPicker
 
-            Button(action: { appState.fetchContributions() }) {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 11))
+            Button(action: { appState.refreshContributions() }) {
+                Group {
+                    if appState.isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 11))
+                    }
+                }
             }
             .buttonStyle(.plain)
             .disabled(appState.isLoading)
@@ -162,27 +169,18 @@ struct MenuBarView: View {
 
     // MARK: - Year Dropdown
 
-    private var yearDropdown: some View {
-        Menu {
-            Button("Last 12 months") { appState.selectYear(nil) }
-            Divider()
+    private var yearPicker: some View {
+        Picker("", selection: selectedYearBinding) {
+            Text("Last 12 months").tag(Optional<Int>.none)
             ForEach(appState.availableYears, id: \.self) { year in
-                Button(String(year)) { appState.selectYear(year) }
+                Text(String(year)).tag(Optional(year))
             }
-        } label: {
-            HStack(spacing: 3) {
-                Text(appState.selectedYear.map(String.init) ?? "Last 12 months")
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 7))
-            }
-            .font(.system(size: 11))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(RoundedRectangle(cornerRadius: 5).fill(.quaternary.opacity(0.5)))
         }
-        .menuStyle(.borderlessButton)
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .controlSize(.small)
         .fixedSize()
+        .disabled(appState.isLoading)
     }
 
     // MARK: - Footer
@@ -260,11 +258,25 @@ struct MenuBarView: View {
         VStack(spacing: 8) {
             ProgressView()
                 .scaleEffect(0.8)
-            Text("Fetching contributions...")
+            Text(loadingMessage)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
         }
         .frame(height: 120)
+    }
+
+    private var loadingMessage: String {
+        if let year = appState.selectedYear {
+            return "Loading \(year) contributions..."
+        }
+        return "Fetching contributions..."
+    }
+
+    private var selectedYearBinding: Binding<Int?> {
+        Binding(
+            get: { appState.selectedYear },
+            set: { appState.selectYear($0) }
+        )
     }
 
     // MARK: - Error Views

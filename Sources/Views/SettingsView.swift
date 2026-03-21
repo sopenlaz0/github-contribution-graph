@@ -88,21 +88,17 @@ struct SettingsView: View {
 
             Spacer()
 
-            Menu {
-                Button("Last 12 months") { appState.selectYear(nil) }
-                Divider()
+            Picker("", selection: selectedYearBinding) {
+                Text("Last 12 months").tag(Optional<Int>.none)
                 ForEach(appState.availableYears, id: \.self) { year in
-                    Button(String(year)) { appState.selectYear(year) }
+                    Text(String(year)).tag(Optional(year))
                 }
-            } label: {
-                HStack(spacing: 3) {
-                    Text(appState.selectedYear.map(String.init) ?? "Last 12 months")
-                    Image(systemName: "chevron.up.chevron.down").font(.system(size: 7))
-                }
-                .font(.system(size: 11))
             }
-            .menuStyle(.borderlessButton)
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .controlSize(.small)
             .fixedSize()
+            .disabled(appState.isLoading)
         }
     }
 
@@ -125,5 +121,12 @@ struct SettingsView: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
         }
+    }
+
+    private var selectedYearBinding: Binding<Int?> {
+        Binding(
+            get: { appState.selectedYear },
+            set: { appState.selectYear($0) }
+        )
     }
 }
