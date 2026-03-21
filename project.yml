@@ -7,7 +7,7 @@ options:
   bundleIdPrefix: com.contributions
   deploymentTarget:
     macOS: "14.0"
-  xcodeVersion: "15.0"
+  xcodeVersion: "16.2"
   minimumXcodeGenVersion: "2.35"
 
 settings:
@@ -33,5 +33,6 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.contributions.GitHubContributions
         PRODUCT_NAME: GitHubContributions
         INFOPLIST_FILE: Resources/Info.plist
-        CODE_SIGN_ENTITLEMENTS: Resources/GitHubContributions.entitlements
+        # Xcode 16+ may merge entitlements while signing; allow it for local builds.
+        CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION: YES
         COMBINE_HIDPI_IMAGES: true

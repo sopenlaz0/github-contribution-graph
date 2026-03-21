@@ -106,7 +106,7 @@ git tag v1.1.0
 git push origin v1.1.0
 ```
 
-GitHub Actions builds on macOS 15, creates a DMG + zip, and publishes a Release.
+GitHub Actions builds on macOS 15 with Xcode 16.2, packages both a DMG and ZIP, and publishes a Release.
 
 ## Project Structure
 

@@ -107,12 +107,20 @@ final class AppState: ObservableObject {
 
     func selectYear(_ year: Int?) {
         selectedYear = year
-        fetchContributions()
+        fetchContributions(resetCalendar: true)
+    }
+
+    func refreshContributions() {
+        fetchContributions(resetCalendar: true)
     }
 
     // MARK: - Fetch Contributions
 
-    func fetchContributions() {
+    func fetchContributions(resetCalendar: Bool = false) {
+        if resetCalendar {
+            calendar = nil
+            errorMessage = nil
+        }
         refreshTask?.cancel()
         refreshTask = Task { await performFetch() }
     }
