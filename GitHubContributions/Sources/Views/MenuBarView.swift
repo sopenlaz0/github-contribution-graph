@@ -1,6 +1,6 @@
 // Sources/Views/MenuBarView.swift
 // Main popover view shown when clicking the menu bar icon.
-// Handles the full flow: setup → login → contribution graph.
+// Handles login flow and displays the contribution graph.
 // RELEVANT FILES: Sources/Views/ContributionGraphView.swift, Sources/State/AppState.swift
 
 import SwiftUI
@@ -15,9 +15,7 @@ struct MenuBarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !appState.hasClientId {
-                setupView
-            } else if appState.isAuthorizing {
+            if appState.isAuthorizing {
                 authorizingView
             } else if appState.isLoggedIn {
                 loggedInContent
@@ -35,6 +33,86 @@ struct MenuBarView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView(appState: appState)
         }
+    }
+
+    // MARK: - Login View
+
+    private var loginView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "person.crop.circle")
+                .font(.system(size: 32))
+                .foregroundStyle(.secondary)
+
+            Text("GitHub Contributions")
+                .font(.system(size: 14, weight: .semibold))
+
+            Text("See your contribution graph at a glance.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+
+            if let error = appState.errorMessage {
+                Text(error)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
+            }
+
+            Button(action: { appState.login() }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.right.circle.fill")
+                    Text("Login with GitHub")
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
+        }
+        .padding(.vertical, 12)
+    }
+
+    // MARK: - Authorizing View (Device Flow)
+
+    private var authorizingView: some View {
+        VStack(spacing: 14) {
+            Text("First, copy your one-time code:")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+
+            if let code = appState.deviceUserCode {
+                Text(code)
+                    .font(.system(size: 32, weight: .bold, design: .monospaced))
+                    .textSelection(.enabled)
+
+                Button("Copy Code") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(code, forType: .string)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+
+            Text("Then enter it on the GitHub page that just opened.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            HStack(spacing: 6) {
+                ProgressView()
+                    .scaleEffect(0.6)
+                Text("Waiting for authorization...")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.top, 4)
+
+            Button("Cancel") {
+                appState.cancelLogin()
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 10))
+            .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 12)
     }
 
     // MARK: - Logged In Content
@@ -116,110 +194,6 @@ struct MenuBarView: View {
             .padding(.leading, 4)
             .help("Quit GitHubContributions")
         }
-    }
-
-    // MARK: - Setup View (First Time — No Client ID)
-
-    private var setupView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "key.fill")
-                .font(.system(size: 28))
-                .foregroundStyle(.secondary)
-
-            Text("One-Time Setup")
-                .font(.system(size: 13, weight: .semibold))
-
-            Text("Create a GitHub OAuth App to enable login.\nTakes about 30 seconds.")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            Button("Setup") {
-                showSettings = true
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
-        }
-        .padding(.vertical, 8)
-    }
-
-    // MARK: - Login View (Has Client ID, Not Logged In)
-
-    private var loginView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "person.crop.circle")
-                .font(.system(size: 28))
-                .foregroundStyle(.secondary)
-
-            Text("GitHub Contributions")
-                .font(.system(size: 13, weight: .semibold))
-
-            if let error = appState.errorMessage {
-                Text(error)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.red)
-                    .multilineTextAlignment(.center)
-            }
-
-            Button(action: { appState.login() }) {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.right.circle.fill")
-                    Text("Login with GitHub")
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
-
-            HStack {
-                Button(action: { showSettings = true }) {
-                    Text("Settings")
-                        .font(.system(size: 10))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-            }
-        }
-        .padding(.vertical, 8)
-    }
-
-    // MARK: - Authorizing View (Device Flow In Progress)
-
-    private var authorizingView: some View {
-        VStack(spacing: 12) {
-            Text("Enter this code on GitHub:")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-
-            if let code = appState.deviceUserCode {
-                Text(code)
-                    .font(.system(size: 28, weight: .bold, design: .monospaced))
-                    .textSelection(.enabled)
-
-                Button("Copy Code") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(code, forType: .string)
-                }
-                .buttonStyle(.plain)
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-            }
-
-            HStack(spacing: 6) {
-                ProgressView()
-                    .scaleEffect(0.6)
-                Text("Waiting for authorization...")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            }
-
-            Button("Cancel") {
-                appState.cancelLogin()
-            }
-            .buttonStyle(.plain)
-            .font(.system(size: 10))
-            .foregroundStyle(.secondary)
-        }
-        .padding(.vertical, 8)
     }
 
     // MARK: - Loading
