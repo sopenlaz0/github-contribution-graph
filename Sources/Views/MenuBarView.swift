@@ -115,7 +115,11 @@ struct MenuBarView: View {
     private func contributionView(_ calendar: ContributionCalendar) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             header(totalContributions: calendar.totalContributions)
-            ContributionGraphView(calendar: calendar, todayId: appState.todayDateString)
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)
+                ContributionGraphView(calendar: calendar, todayId: appState.todayDateString)
+                Spacer(minLength: 0)
+            }
             footer
         }
     }
