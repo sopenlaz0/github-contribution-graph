@@ -7,8 +7,6 @@ import Foundation
 
 // MARK: - GitHub Auth (via `gh` CLI)
 
-/// Grabs the auth token from the `gh` CLI that's already installed on the user's machine.
-/// No OAuth apps, no Client IDs, no tokens to paste. Just `gh auth token`.
 final class GitHubAuth {
 
     /// Returns the OAuth token from the user's `gh` CLI session.
@@ -23,11 +21,6 @@ final class GitHubAuth {
     /// Checks whether `gh` is installed and reachable.
     func isInstalled() -> Bool {
         findGHPath() != nil
-    }
-
-    /// Returns a human-readable auth status string.
-    func getAuthStatus() async -> String? {
-        try? await runGH(["auth", "status"])
     }
 
     // MARK: - Process Execution
@@ -50,7 +43,6 @@ final class GitHubAuth {
         process.executableURL = URL(fileURLWithPath: ghPath)
         process.arguments = args
 
-        // Ensure gh can find its config and dependencies
         var env = ProcessInfo.processInfo.environment
         let extraPaths = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
         env["PATH"] = extraPaths + ":" + (env["PATH"] ?? "")
@@ -63,14 +55,24 @@ final class GitHubAuth {
 
         do {
             try process.run()
-            process.waitUntilExit()
         } catch {
             return .failure(.ghNotInstalled)
         }
 
+        // Read pipes BEFORE waitUntilExit to avoid deadlock if buffer fills
         let outData = stdout.fileHandleForReading.readDataToEndOfFile()
         let output = String(data: outData, encoding: .utf8)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        // Timeout: kill if gh hangs for more than 10 seconds
+        let deadline = DispatchTime.now() + .seconds(10)
+        DispatchQueue.global().asyncAfter(deadline: deadline) { [weak process] in
+            if process?.isRunning == true {
+                process?.terminate()
+            }
+        }
+
+        process.waitUntilExit()
 
         if process.terminationStatus == 0 {
             return .success(output)
@@ -81,7 +83,6 @@ final class GitHubAuth {
 
     // MARK: - Find `gh` Binary
 
-    /// Checks common install locations for the `gh` binary.
     private func findGHPath() -> String? {
         let candidates = [
             "/opt/homebrew/bin/gh",
@@ -96,7 +97,6 @@ final class GitHubAuth {
             }
         }
 
-        // Last resort: check user's home .nix-profile
         let homeNix = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".nix-profile/bin/gh").path
         if FileManager.default.isExecutableFile(atPath: homeNix) {

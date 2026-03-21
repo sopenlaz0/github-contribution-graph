@@ -39,6 +39,18 @@ struct ContributionGraphView: View {
     private let cellSize: CGFloat = 10
     private let cellSpacing: CGFloat = 3
 
+    /// Pre-computed lookup for fast hover info display.
+    private var dayLookup: [String: ContributionDay] {
+        var dict = [String: ContributionDay]()
+        dict.reserveCapacity(calendar.weeks.count * 7)
+        for week in calendar.weeks {
+            for day in week.contributionDays {
+                dict[day.id] = day
+            }
+        }
+        return dict
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             monthLabels
@@ -94,7 +106,7 @@ struct ContributionGraphView: View {
 
     private var hoverInfo: some View {
         Group {
-            if let id = hoveredDayId, let day = findDay(by: id) {
+            if let id = hoveredDayId, let day = dayLookup[id] {
                 Text(Self.tooltipText(for: day))
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
@@ -104,15 +116,6 @@ struct ContributionGraphView: View {
             }
         }
         .frame(height: 14)
-    }
-
-    private func findDay(by id: String) -> ContributionDay? {
-        for week in calendar.weeks {
-            if let day = week.contributionDays.first(where: { $0.id == id }) {
-                return day
-            }
-        }
-        return nil
     }
 
     // MARK: - Day Labels
@@ -134,7 +137,7 @@ struct ContributionGraphView: View {
         .padding(.trailing, 4)
     }
 
-    // MARK: - Tooltip (shared with ContributionCellView)
+    // MARK: - Tooltip
 
     static func tooltipText(for day: ContributionDay) -> String {
         let count = day.contributionCount
@@ -149,12 +152,16 @@ struct ContributionGraphView: View {
     static let dateParser: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
         return f
     }()
 
     private static let tooltipFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "EEEE, MMMM d, yyyy"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
         return f
     }()
 
@@ -200,16 +207,18 @@ struct ContributionGraphView: View {
     }
 }
 
-// MARK: - Contribution Cell (separate view for hover performance)
+// MARK: - Contribution Cell
 
-/// Each cell is its own View so SwiftUI only redraws the hovered/unhovered cells,
-/// not the entire 365-cell grid on every hover change.
+/// Separate View struct so SwiftUI only redraws the 2 cells that change on hover,
+/// not the entire 365-cell grid.
 struct ContributionCellView: View {
     let day: ContributionDay
     let isHovered: Bool
     let fillColor: Color
     let cellSize: CGFloat
     let onHover: (Bool) -> Void
+
+    @State private var isCursorPushed = false
 
     var body: some View {
         RoundedRectangle(cornerRadius: 2)
@@ -221,12 +230,20 @@ struct ContributionCellView: View {
                     .opacity(isHovered ? 1 : 0)
             )
             .onHover { hovered in
-                if hovered {
+                if hovered && !isCursorPushed {
                     NSCursor.pointingHand.push()
-                } else {
+                    isCursorPushed = true
+                } else if !hovered && isCursorPushed {
                     NSCursor.pop()
+                    isCursorPushed = false
                 }
                 onHover(hovered)
+            }
+            .onDisappear {
+                if isCursorPushed {
+                    NSCursor.pop()
+                    isCursorPushed = false
+                }
             }
             .help(ContributionGraphView.tooltipText(for: day))
     }

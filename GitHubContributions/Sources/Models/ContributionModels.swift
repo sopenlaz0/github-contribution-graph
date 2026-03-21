@@ -7,7 +7,6 @@ import SwiftUI
 
 // MARK: - GraphQL Response Models
 
-/// Top-level GraphQL response wrapper.
 struct GraphQLResponse: Codable {
     let data: GraphQLData?
     let errors: [GraphQLError]?
@@ -31,7 +30,6 @@ struct ContributionsCollection: Codable {
 
 // MARK: - Contribution Calendar
 
-/// The full year contribution calendar — contains weeks, total count, and colors.
 struct ContributionCalendar: Codable {
     let totalContributions: Int
     let weeks: [ContributionWeek]
@@ -40,8 +38,9 @@ struct ContributionCalendar: Codable {
 struct ContributionWeek: Codable, Identifiable {
     let contributionDays: [ContributionDay]
 
+    /// Deterministic ID — uses the first day's date, or a stable fallback.
     var id: String {
-        contributionDays.first?.date ?? UUID().uuidString
+        contributionDays.first?.date ?? "empty-week"
     }
 }
 
@@ -52,7 +51,6 @@ struct ContributionDay: Codable, Identifiable {
 
     var id: String { date }
 
-    /// Converts the hex color string from GitHub into a SwiftUI Color.
     var swiftUIColor: Color {
         Color(hex: color)
     }
@@ -66,7 +64,11 @@ extension Color {
         let hex = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
         let scanner = Scanner(string: hex)
         var rgbValue: UInt64 = 0
-        scanner.scanHexInt64(&rgbValue)
+
+        guard hex.count == 6, scanner.scanHexInt64(&rgbValue) else {
+            self.init(red: 0, green: 0, blue: 0)
+            return
+        }
 
         let r = Double((rgbValue & 0xFF0000) >> 16) / 255.0
         let g = Double((rgbValue & 0x00FF00) >> 8) / 255.0

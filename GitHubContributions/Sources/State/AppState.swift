@@ -37,6 +37,7 @@ final class AppState: ObservableObject {
     private let auth = GitHubAuth()
     private let service = GitHubService()
     private var token: String = ""
+    private var authTask: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
 
     // MARK: - Computed
@@ -45,13 +46,11 @@ final class AppState: ObservableObject {
         authStatus == .loggedIn && !token.isEmpty
     }
 
-    /// Available years for the picker: current year down to 4 years back.
     var availableYears: [Int] {
         let current = Foundation.Calendar.current.component(.year, from: Date())
         return Array((current - 4)...current).reversed()
     }
 
-    /// Label for the contributions header.
     var contributionPeriodLabel: String {
         if let year = selectedYear {
             return "in \(year)"
@@ -62,16 +61,20 @@ final class AppState: ObservableObject {
     // MARK: - Auth
 
     func checkAuth() {
-        Task { await performAuthCheck() }
+        authTask?.cancel()
+        authTask = Task { await performAuthCheck() }
     }
 
     func logout() {
+        authTask?.cancel()
         refreshTask?.cancel()
         token = ""
         username = ""
         calendar = nil
         lastUpdated = nil
         errorMessage = nil
+        selectedYear = nil
+        isLoading = false
         authStatus = .needsLogin
     }
 
@@ -101,19 +104,23 @@ final class AppState: ObservableObject {
 
         do {
             let fetchedToken = try await auth.getToken()
+            guard !Task.isCancelled else { return }
             token = fetchedToken
 
             let fetchedUsername = try await service.fetchUsername(token: fetchedToken)
+            guard !Task.isCancelled else { return }
             username = fetchedUsername
             authStatus = .loggedIn
 
             fetchContributions()
         } catch let error as AuthError {
+            guard !Task.isCancelled else { return }
             switch error {
             case .ghNotInstalled: authStatus = .needsGH
             case .notAuthenticated: authStatus = .needsLogin
             }
         } catch {
+            guard !Task.isCancelled else { return }
             authStatus = .error(error.localizedDescription)
         }
     }
@@ -125,6 +132,8 @@ final class AppState: ObservableObject {
 
         isLoading = true
         errorMessage = nil
+
+        defer { isLoading = false }
 
         do {
             let result = try await service.fetchContributions(
@@ -145,7 +154,5 @@ final class AppState: ObservableObject {
                 errorMessage = error.localizedDescription
             }
         }
-
-        isLoading = false
     }
 }
