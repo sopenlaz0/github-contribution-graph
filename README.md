@@ -9,11 +9,17 @@ A minimal macOS menu bar app that shows your GitHub contribution graph. Glance a
 ![SwiftUI](https://img.shields.io/badge/SwiftUI-MenuBarExtra-green)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-## Download
+## Download & Install
 
-Grab the latest `.zip` from [Releases](../../releases), unzip, drag `GitHubContributions.app` to `/Applications`.
+1. Grab the latest `.dmg` or `.zip` from [Releases](../../releases)
+2. If using the zip, unzip and drag `GitHubContributions.app` to `/Applications`
+3. Remove the quarantine flag (macOS blocks unsigned downloaded apps):
 
-> On first launch, macOS may block it. Right-click → Open → Open to bypass Gatekeeper.
+```bash
+xattr -cr /Applications/GitHubContributions.app
+```
+
+4. Open the app — it appears in your menu bar
 
 **Prerequisite:** [GitHub CLI](https://cli.github.com/) installed and logged in:
 
@@ -138,7 +144,7 @@ make release   # Build release .app (ad-hoc signed)
 make sign      # Sign with Developer ID
 make notarize  # Notarize with Apple
 make dmg       # Create DMG installer
-make install   # Copy to /Applications
+make install   # Copy to /Applications + clear quarantine
 make clean     # Remove build artifacts
 make open      # Open in Xcode
 ```

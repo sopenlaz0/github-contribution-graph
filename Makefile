@@ -88,9 +88,10 @@ dmg: release
 	@rm -rf dmg_contents
 	@echo "Created: $(APP_NAME).dmg"
 
-# Install to /Applications
+# Install to /Applications and clear quarantine
 install: release
 	@cp -R "$(APP_RELEASE)" /Applications/
+	@xattr -cr /Applications/$(APP_NAME).app
 	@echo "Installed to /Applications/$(APP_NAME).app"
 
 # Clean build artifacts
