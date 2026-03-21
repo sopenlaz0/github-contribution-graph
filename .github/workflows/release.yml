@@ -7,9 +7,12 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+
+      - name: Select Xcode 16
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -27,18 +30,32 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
 
-      - name: Package app
+      - name: Create DMG
         run: |
           APP_PATH="build/Build/Products/Release/GitHubContributions.app"
-          mkdir -p release
-          cp -R "$APP_PATH" release/
-          cd release
+
+          # Create DMG contents with app + Applications symlink
+          mkdir -p dmg_contents
+          cp -R "$APP_PATH" dmg_contents/
+          ln -s /Applications dmg_contents/Applications
+
+          # Build the DMG
+          hdiutil create \
+            -volname "GitHub Contributions" \
+            -srcfolder dmg_contents \
+            -ov -format UDZO \
+            GitHubContributions.dmg
+
+          # Also zip for users who prefer it
+          cd dmg_contents
           zip -r ../GitHubContributions.zip GitHubContributions.app
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: GitHubContributions.zip
+          files: |
+            GitHubContributions.dmg
+            GitHubContributions.zip
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
