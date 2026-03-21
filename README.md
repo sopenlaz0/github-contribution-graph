@@ -9,11 +9,17 @@ A minimal macOS menu bar app that shows your GitHub contribution graph. Glance a
 ![SwiftUI](https://img.shields.io/badge/SwiftUI-MenuBarExtra-green)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-## Download
+## Download & Install
 
-Grab the latest `.dmg` or `.zip` from [Releases](../../releases), then move `GitHubContributions.app` to `/Applications`.
+1. Grab the latest `.dmg` or `.zip` from [Releases](../../releases)
+2. If using the zip, unzip and drag `GitHubContributions.app` to `/Applications`
+3. Remove the quarantine flag (macOS blocks unsigned downloaded apps):
 
-> On first launch, macOS may block it. Right-click → Open → Open to bypass Gatekeeper.
+```bash
+xattr -cr /Applications/GitHubContributions.app
+```
+
+4. Open the app — it appears in your menu bar
 
 **Prerequisite:** [GitHub CLI](https://cli.github.com/) installed and logged in:
 
@@ -53,13 +59,51 @@ Or open in Xcode: `make open` → `Cmd + R`.
 
 If `gh` isn't installed or you're not logged in, the app shows the exact commands to run with copy buttons.
 
+## Sign & Notarize
+
+By default, the release build is ad-hoc signed. To properly sign and notarize so macOS doesn't block the app:
+
+### 1. Find your signing identity
+
+```bash
+security find-identity -v -p codesigning
+```
+
+### 2. Sign the app
+
+```bash
+make sign IDENTITY="Developer ID Application: Your Name (TEAMID)"
+```
+
+### 3. Notarize with Apple (optional, removes all Gatekeeper warnings)
+
+First, store your credentials once:
+
+```bash
+xcrun notarytool store-credentials "notary" \
+  --apple-id you@email.com \
+  --team-id ABCDE12345
+```
+
+Then notarize:
+
+```bash
+make notarize APPLE_ID="you@email.com" TEAM_ID="ABCDE12345"
+```
+
+### 4. Create a DMG
+
+```bash
+make dmg
+```
+
 ## Creating a Release
 
 Push a version tag to trigger the build:
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.1.0
+git push origin v1.1.0
 ```
 
 GitHub Actions builds on macOS 15 with Xcode 16.2, packages both a DMG and ZIP, and publishes a Release.
@@ -96,8 +140,11 @@ GitHub Actions builds on macOS 15 with Xcode 16.2, packages both a DMG and ZIP, 
 make setup     # Generate Xcode project
 make build     # Build debug
 make run       # Build and open the app
-make release   # Build release .app
-make install   # Copy to /Applications
+make release   # Build release .app (ad-hoc signed)
+make sign      # Sign with Developer ID
+make notarize  # Notarize with Apple
+make dmg       # Create DMG installer
+make install   # Copy to /Applications + clear quarantine
 make clean     # Remove build artifacts
 make open      # Open in Xcode
 ```
