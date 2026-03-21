@@ -1,6 +1,6 @@
 // Sources/State/AppState.swift
 // Observable app state that drives the entire UI.
-// Uses `gh` CLI for auth, then fetches contributions via the GitHub API.
+// Uses `gh` CLI for auth, supports year selection for contributions.
 // RELEVANT FILES: Sources/Services/GitHubAuth.swift, Sources/Services/GitHubService.swift
 
 import SwiftUI
@@ -10,8 +10,8 @@ import SwiftUI
 enum AuthStatus: Equatable {
     case checking
     case loggedIn
-    case needsGH          // `gh` CLI not installed
-    case needsLogin       // `gh` installed but not authenticated
+    case needsGH
+    case needsLogin
     case error(String)
 }
 
@@ -29,6 +29,9 @@ final class AppState: ObservableObject {
     @Published var errorMessage: String?
     @Published var lastUpdated: Date?
 
+    /// nil = last 12 months (default), or a specific year like 2026
+    @Published var selectedYear: Int? = nil
+
     // MARK: - Private
 
     private let auth = GitHubAuth()
@@ -42,15 +45,26 @@ final class AppState: ObservableObject {
         authStatus == .loggedIn && !token.isEmpty
     }
 
+    /// Available years for the picker: current year down to 4 years back.
+    var availableYears: [Int] {
+        let current = Foundation.Calendar.current.component(.year, from: Date())
+        return Array((current - 4)...current).reversed()
+    }
+
+    /// Label for the contributions header.
+    var contributionPeriodLabel: String {
+        if let year = selectedYear {
+            return "in \(year)"
+        }
+        return "in the last year"
+    }
+
     // MARK: - Auth
 
-    /// Attempts to grab the token from `gh auth token`.
-    /// If `gh` is installed and logged in, we're good to go.
     func checkAuth() {
         Task { await performAuthCheck() }
     }
 
-    /// Clears local state (doesn't affect `gh` auth).
     func logout() {
         refreshTask?.cancel()
         token = ""
@@ -59,6 +73,13 @@ final class AppState: ObservableObject {
         lastUpdated = nil
         errorMessage = nil
         authStatus = .needsLogin
+    }
+
+    // MARK: - Year Selection
+
+    func selectYear(_ year: Int?) {
+        selectedYear = year
+        fetchContributions()
     }
 
     // MARK: - Fetch Contributions
@@ -89,10 +110,8 @@ final class AppState: ObservableObject {
             fetchContributions()
         } catch let error as AuthError {
             switch error {
-            case .ghNotInstalled:
-                authStatus = .needsGH
-            case .notAuthenticated:
-                authStatus = .needsLogin
+            case .ghNotInstalled: authStatus = .needsGH
+            case .notAuthenticated: authStatus = .needsLogin
             }
         } catch {
             authStatus = .error(error.localizedDescription)
@@ -109,7 +128,7 @@ final class AppState: ObservableObject {
 
         do {
             let result = try await service.fetchContributions(
-                username: username, token: token
+                username: username, token: token, year: selectedYear
             )
             guard !Task.isCancelled else { return }
 

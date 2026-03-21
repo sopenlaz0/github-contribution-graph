@@ -1,6 +1,6 @@
 // Sources/Services/GitHubService.swift
 // Handles communication with the GitHub API (both GraphQL and REST).
-// Fetches contributions and authenticated user info.
+// Fetches contributions (with optional year filtering) and user info.
 // RELEVANT FILES: Sources/Models/ContributionModels.swift, Sources/Services/GitHubAuth.swift
 
 import Foundation
@@ -15,7 +15,6 @@ final class GitHubService {
 
     // MARK: - Fetch Authenticated User
 
-    /// Fetches the username of the authenticated user from the REST API.
     func fetchUsername(token: String) async throws -> String {
         let url = restEndpoint.appendingPathComponent("user")
 
@@ -35,9 +34,9 @@ final class GitHubService {
 
     // MARK: - Fetch Contributions
 
-    /// Fetches the contribution calendar for a given username using the GraphQL API.
-    func fetchContributions(username: String, token: String) async throws -> ContributionCalendar {
-        let query = buildQuery(username: username)
+    /// Fetches the contribution calendar. Pass `year` to get a specific year, or nil for the last 12 months.
+    func fetchContributions(username: String, token: String, year: Int? = nil) async throws -> ContributionCalendar {
+        let query = buildQuery(username: username, year: year)
         let body: [String: Any] = ["query": query]
 
         var request = URLRequest(url: graphQLEndpoint)
@@ -71,11 +70,18 @@ final class GitHubService {
 
     // MARK: - Private
 
-    private func buildQuery(username: String) -> String {
-        """
+    private func buildQuery(username: String, year: Int?) -> String {
+        let collectionArgs: String
+        if let year = year {
+            collectionArgs = "(from: \"\(year)-01-01T00:00:00Z\", to: \"\(year)-12-31T23:59:59Z\")"
+        } else {
+            collectionArgs = ""
+        }
+
+        return """
         query {
           user(login: "\(username)") {
-            contributionsCollection {
+            contributionsCollection\(collectionArgs) {
               contributionCalendar {
                 totalContributions
                 weeks {
@@ -95,7 +101,6 @@ final class GitHubService {
 
 // MARK: - REST API Models
 
-/// Minimal user info from the GitHub REST API `/user` endpoint.
 struct GitHubUserInfo: Codable {
     let login: String
 }

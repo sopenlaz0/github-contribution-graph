@@ -1,9 +1,32 @@
 // Sources/Views/ContributionGraphView.swift
 // Renders the GitHub-style contribution grid (green squares).
-// This is the core visual component — a 52-week x 7-day grid of colored cells.
+// Supports dark mode with GitHub's exact color palette.
 // RELEVANT FILES: Sources/Models/ContributionModels.swift, Sources/Views/MenuBarView.swift
 
 import SwiftUI
+
+// MARK: - GitHub Color Palette
+
+/// Maps GitHub's light-mode API colors to their dark-mode equivalents.
+enum GitHubColors {
+    private static let lightToDark: [String: String] = [
+        "#ebedf0": "#161b22",
+        "#9be9a8": "#0e4429",
+        "#40c463": "#006d32",
+        "#30a14e": "#26a641",
+        "#216e39": "#39d353",
+    ]
+
+    static let lightLevels = ["#ebedf0", "#9be9a8", "#40c463", "#30a14e", "#216e39"]
+    static let darkLevels  = ["#161b22", "#0e4429", "#006d32", "#26a641", "#39d353"]
+
+    static func color(for apiHex: String, scheme: ColorScheme) -> Color {
+        if scheme == .dark, let darkHex = lightToDark[apiHex.lowercased()] {
+            return Color(hex: darkHex)
+        }
+        return Color(hex: apiHex)
+    }
+}
 
 // MARK: - Contribution Graph View
 
@@ -11,13 +34,13 @@ struct ContributionGraphView: View {
 
     let calendar: ContributionCalendar
 
-    /// Size of each contribution square.
+    @Environment(\.colorScheme) private var colorScheme
+
     private let cellSize: CGFloat = 10
-    /// Gap between squares.
-    private let cellSpacing: CGFloat = 2
+    private let cellSpacing: CGFloat = 3
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 2) {
             monthLabels
             graphGrid
         }
@@ -25,12 +48,10 @@ struct ContributionGraphView: View {
 
     // MARK: - Month Labels
 
-    /// Row of month abbreviations aligned above the grid columns.
     private var monthLabels: some View {
         HStack(spacing: 0) {
-            // Left spacer to align with day labels
             Text("")
-                .frame(width: 28)
+                .frame(width: 32)
 
             let months = extractMonthLabels()
             ForEach(months, id: \.offset) { item in
@@ -44,7 +65,6 @@ struct ContributionGraphView: View {
 
     // MARK: - Grid
 
-    /// The main grid: 7 rows (days) x N columns (weeks).
     private var graphGrid: some View {
         HStack(spacing: 0) {
             dayLabels
@@ -54,9 +74,9 @@ struct ContributionGraphView: View {
                     VStack(spacing: cellSpacing) {
                         ForEach(week.contributionDays) { day in
                             RoundedRectangle(cornerRadius: 2)
-                                .fill(day.swiftUIColor)
+                                .fill(GitHubColors.color(for: day.color, scheme: colorScheme))
                                 .frame(width: cellSize, height: cellSize)
-                                .help("\(day.contributionCount) contributions on \(day.date)")
+                                .help(tooltipText(for: day))
                         }
                     }
                 }
@@ -66,36 +86,53 @@ struct ContributionGraphView: View {
 
     // MARK: - Day Labels
 
-    /// Abbreviated day-of-week labels on the left side (Mon, Wed, Fri).
     private var dayLabels: some View {
         VStack(spacing: cellSpacing) {
             ForEach(0..<7, id: \.self) { index in
                 if index == 1 || index == 3 || index == 5 {
-                    Text(dayAbbreviation(index))
+                    Text(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][index])
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
-                        .frame(width: 24, height: cellSize, alignment: .trailing)
+                        .frame(width: 26, height: cellSize, alignment: .trailing)
                 } else {
-                    Text("")
-                        .frame(width: 24, height: cellSize)
+                    Color.clear
+                        .frame(width: 26, height: cellSize)
                 }
             }
         }
         .padding(.trailing, 4)
     }
 
-    // MARK: - Helpers
+    // MARK: - Tooltip
 
-    private func dayAbbreviation(_ index: Int) -> String {
-        let days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-        return days[index]
+    /// Formats the tooltip like GitHub: "5 contributions on Friday, March 21, 2026"
+    private func tooltipText(for day: ContributionDay) -> String {
+        let count = day.contributionCount
+        let countText = count == 0 ? "No contributions" : "\(count) contribution\(count == 1 ? "" : "s")"
+
+        guard let date = Self.dateParser.date(from: day.date) else {
+            return "\(countText) on \(day.date)"
+        }
+        return "\(countText) on \(Self.tooltipFormatter.string(from: date))"
     }
 
-    /// Extracts month labels with their column spans from the calendar data.
+    private static let dateParser: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
+    private static let tooltipFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEEE, MMMM d, yyyy"
+        return f
+    }()
+
+    // MARK: - Month Label Extraction
+
     private func extractMonthLabels() -> [(offset: Int, label: String, span: Int)] {
         var result: [(offset: Int, label: String, span: Int)] = []
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
+        let formatter = Self.dateParser
 
         let monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
                           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -125,7 +162,6 @@ struct ContributionGraphView: View {
             }
         }
 
-        // Append last month
         if currentMonth != -1 {
             result.append((offset: startOffset, label: monthNames[currentMonth - 1], span: currentSpan))
         }
@@ -136,26 +172,20 @@ struct ContributionGraphView: View {
 
 // MARK: - Legend
 
-/// The color legend showing contribution levels (less → more).
 struct ContributionLegend: View {
 
-    private let colors: [Color] = [
-        Color(hex: "#ebedf0"),
-        Color(hex: "#9be9a8"),
-        Color(hex: "#40c463"),
-        Color(hex: "#30a14e"),
-        Color(hex: "#216e39")
-    ]
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 3) {
             Text("Less")
                 .font(.system(size: 9))
                 .foregroundStyle(.secondary)
 
-            ForEach(0..<colors.count, id: \.self) { index in
+            let hexes = colorScheme == .dark ? GitHubColors.darkLevels : GitHubColors.lightLevels
+            ForEach(0..<hexes.count, id: \.self) { i in
                 RoundedRectangle(cornerRadius: 2)
-                    .fill(colors[index])
+                    .fill(Color(hex: hexes[i]))
                     .frame(width: 10, height: 10)
             }
 
