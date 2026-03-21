@@ -1,6 +1,6 @@
-# GitHubContributions/project.yml
+# project.yml
 # XcodeGen project spec for generating the Xcode project.
-# Run `xcodegen generate` in this directory to create GitHubContributions.xcodeproj
+# Run `xcodegen generate` to create GitHubContributions.xcodeproj
 
 name: GitHubContributions
 options:

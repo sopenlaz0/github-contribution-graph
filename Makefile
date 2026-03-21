@@ -1,4 +1,4 @@
-# GitHubContributions/Makefile
+# Makefile
 # Build and run commands for the GitHub Contributions menu bar app.
 
 .PHONY: setup build run release install clean open
