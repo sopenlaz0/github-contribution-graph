@@ -12,6 +12,11 @@ struct GitHubContributionsApp: App {
 
     @StateObject private var appState = AppState()
 
+    init() {
+        // Keep the app menu-bar-only even if launch configuration or plist handling drifts.
+        NSApplication.shared.setActivationPolicy(.accessory)
+    }
+
     var body: some Scene {
         MenuBarExtra {
             MenuBarView(appState: appState)

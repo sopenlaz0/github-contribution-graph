@@ -221,8 +221,6 @@ struct ContributionCellView: View {
     let cellSize: CGFloat
     let onHover: (Bool) -> Void
 
-    @State private var isCursorPushed = false
-
     var body: some View {
         RoundedRectangle(cornerRadius: 2)
             .fill(fillColor)
@@ -233,20 +231,7 @@ struct ContributionCellView: View {
                     .opacity(showBorder ? 1 : 0)
             )
             .onHover { hovered in
-                if hovered && !isCursorPushed {
-                    NSCursor.pointingHand.push()
-                    isCursorPushed = true
-                } else if !hovered && isCursorPushed {
-                    NSCursor.pop()
-                    isCursorPushed = false
-                }
                 onHover(hovered)
-            }
-            .onDisappear {
-                if isCursorPushed {
-                    NSCursor.pop()
-                    isCursorPushed = false
-                }
             }
             .help(ContributionGraphView.tooltipText(for: day))
     }
