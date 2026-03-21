@@ -32,6 +32,7 @@ enum GitHubColors {
 struct ContributionGraphView: View {
 
     let calendar: ContributionCalendar
+    var todayId: String = ""
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var hoveredDayId: String?
@@ -89,6 +90,7 @@ struct ContributionGraphView: View {
                             ContributionCellView(
                                 day: day,
                                 isHovered: hoveredDayId == day.id,
+                                isToday: day.id == todayId,
                                 fillColor: GitHubColors.color(for: day.color, scheme: colorScheme),
                                 cellSize: cellSize,
                                 onHover: { hovered in
@@ -214,6 +216,7 @@ struct ContributionGraphView: View {
 struct ContributionCellView: View {
     let day: ContributionDay
     let isHovered: Bool
+    let isToday: Bool
     let fillColor: Color
     let cellSize: CGFloat
     let onHover: (Bool) -> Void
@@ -226,8 +229,8 @@ struct ContributionCellView: View {
             .frame(width: cellSize, height: cellSize)
             .overlay(
                 RoundedRectangle(cornerRadius: 2)
-                    .strokeBorder(.primary.opacity(0.5), lineWidth: 1)
-                    .opacity(isHovered ? 1 : 0)
+                    .strokeBorder(borderColor, lineWidth: borderWidth)
+                    .opacity(showBorder ? 1 : 0)
             )
             .onHover { hovered in
                 if hovered && !isCursorPushed {
@@ -247,6 +250,10 @@ struct ContributionCellView: View {
             }
             .help(ContributionGraphView.tooltipText(for: day))
     }
+
+    private var showBorder: Bool { isHovered || isToday }
+    private var borderColor: Color { isToday ? .white : .primary.opacity(0.5) }
+    private var borderWidth: CGFloat { isToday ? 1.5 : 1 }
 }
 
 // MARK: - Legend

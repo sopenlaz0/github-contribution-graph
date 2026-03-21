@@ -58,6 +58,31 @@ final class AppState: ObservableObject {
         return "in the last year"
     }
 
+    /// Today's date as "yyyy-MM-dd" for matching against contribution days.
+    private static let todayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = .current
+        return f
+    }()
+
+    var todayDateString: String {
+        Self.todayFormatter.string(from: Date())
+    }
+
+    /// Today's contribution count, extracted from the loaded calendar.
+    var todayContributions: Int? {
+        guard let cal = calendar else { return nil }
+        let today = todayDateString
+        for week in cal.weeks {
+            if let day = week.contributionDays.first(where: { $0.date == today }) {
+                return day.contributionCount
+            }
+        }
+        return nil
+    }
+
     // MARK: - Auth
 
     func checkAuth() {

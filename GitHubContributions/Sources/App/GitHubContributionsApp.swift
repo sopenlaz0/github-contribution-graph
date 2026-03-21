@@ -13,11 +13,16 @@ struct GitHubContributionsApp: App {
     @StateObject private var appState = AppState()
 
     var body: some Scene {
-        // Menu bar item — click to show the contribution graph popover.
         MenuBarExtra {
             MenuBarView(appState: appState)
         } label: {
-            Label("GitHub Contributions", systemImage: "square.grid.3x3.fill")
+            HStack(spacing: 3) {
+                Image(systemName: "square.grid.3x3.fill")
+                if let count = appState.todayContributions {
+                    Text("\(count)")
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                }
+            }
         }
         .menuBarExtraStyle(.window)
     }

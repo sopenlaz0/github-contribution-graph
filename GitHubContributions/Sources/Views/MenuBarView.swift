@@ -63,50 +63,33 @@ struct MenuBarView: View {
         .frame(height: 120)
     }
 
-    // MARK: - Needs GH Installed
+    // MARK: - Needs GH / Login
 
     private var needsGHView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "terminal")
-                .font(.system(size: 28))
-                .foregroundStyle(.secondary)
-
-            Text("GitHub CLI not found")
-                .font(.system(size: 14, weight: .semibold))
-
-            Text("Install it with Homebrew, then log in:")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-
-            VStack(alignment: .leading, spacing: 6) {
-                commandRow("brew install gh")
-                commandRow("gh auth login")
-            }
-            .padding(.vertical, 4)
-
-            retryButton
-        }
-        .padding(.vertical, 12)
+        setupPrompt(
+            icon: "terminal", title: "GitHub CLI not found",
+            subtitle: "Install it with Homebrew, then log in:",
+            commands: ["brew install gh", "gh auth login"]
+        )
     }
 
-    // MARK: - Needs Login
-
     private var needsLoginView: some View {
+        setupPrompt(
+            icon: "person.crop.circle.badge.xmark", title: "Not logged in to GitHub CLI",
+            subtitle: "Run this in your terminal:",
+            commands: ["gh auth login"]
+        )
+    }
+
+    private func setupPrompt(icon: String, title: String, subtitle: String, commands: [String]) -> some View {
         VStack(spacing: 12) {
-            Image(systemName: "person.crop.circle.badge.xmark")
-                .font(.system(size: 28))
-                .foregroundStyle(.secondary)
-
-            Text("Not logged in to GitHub CLI")
-                .font(.system(size: 14, weight: .semibold))
-
-            Text("Run this in your terminal:")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-
-            commandRow("gh auth login")
-                .padding(.vertical, 4)
-
+            Image(systemName: icon).font(.system(size: 28)).foregroundStyle(.secondary)
+            Text(title).font(.system(size: 14, weight: .semibold))
+            Text(subtitle).font(.system(size: 11)).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(commands, id: \.self) { commandRow($0) }
+            }
+            .padding(.vertical, 4)
             retryButton
         }
         .padding(.vertical, 12)
@@ -132,7 +115,7 @@ struct MenuBarView: View {
     private func contributionView(_ calendar: ContributionCalendar) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             header(totalContributions: calendar.totalContributions)
-            ContributionGraphView(calendar: calendar)
+            ContributionGraphView(calendar: calendar, todayId: appState.todayDateString)
             footer
         }
     }
@@ -140,10 +123,14 @@ struct MenuBarView: View {
     // MARK: - Header
 
     private func header(totalContributions: Int) -> some View {
-        HStack(alignment: .center) {
+        HStack(alignment: .center, spacing: 8) {
             Text("\(totalContributions.formatted()) contributions \(appState.contributionPeriodLabel)")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.secondary)
+
+            if let today = appState.todayContributions {
+                todayBadge(count: today)
+            }
 
             Spacer()
 
@@ -158,6 +145,19 @@ struct MenuBarView: View {
             .opacity(appState.isLoading ? 0.5 : 1)
             .padding(.leading, 4)
         }
+    }
+
+    private func todayBadge(count: Int) -> some View {
+        HStack(spacing: 3) {
+            Circle()
+                .fill(.green)
+                .frame(width: 6, height: 6)
+            Text("\(count) today")
+                .font(.system(size: 10, weight: .semibold))
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 2)
+        .background(Capsule().fill(.green.opacity(0.12)))
     }
 
     // MARK: - Year Dropdown
