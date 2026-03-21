@@ -1,6 +1,6 @@
 // Sources/Views/MenuBarView.swift
 // Main popover view shown when clicking the menu bar icon.
-// Shows the contribution graph, or setup instructions if `gh` isn't ready.
+// Shows the contribution graph with year selector, or setup instructions.
 // RELEVANT FILES: Sources/Views/ContributionGraphView.swift, Sources/State/AppState.swift
 
 import SwiftUI
@@ -28,7 +28,7 @@ struct MenuBarView: View {
                 errorView(message)
             }
         }
-        .frame(width: 620)
+        .frame(width: 700)
         .padding(16)
         .onAppear {
             if !appState.isLoggedIn {
@@ -122,7 +122,7 @@ struct MenuBarView: View {
     // MARK: - Contribution View
 
     private func contributionView(_ calendar: ContributionCalendar) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             header(totalContributions: calendar.totalContributions)
             ContributionGraphView(calendar: calendar)
             footer
@@ -132,26 +132,52 @@ struct MenuBarView: View {
     // MARK: - Header
 
     private func header(totalContributions: Int) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("@\(appState.username)")
-                    .font(.system(size: 13, weight: .semibold))
-
-                Text("\(totalContributions) contributions in the last year")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            }
+        HStack(alignment: .center) {
+            Text("\(totalContributions.formatted()) contributions \(appState.contributionPeriodLabel)")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
 
             Spacer()
 
+            yearPicker
+
             Button(action: { appState.fetchContributions() }) {
                 Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 12))
+                    .font(.system(size: 11))
             }
             .buttonStyle(.plain)
             .disabled(appState.isLoading)
             .opacity(appState.isLoading ? 0.5 : 1)
+            .padding(.leading, 6)
         }
+    }
+
+    // MARK: - Year Picker
+
+    private var yearPicker: some View {
+        HStack(spacing: 2) {
+            yearButton(label: "Last year", year: nil)
+            ForEach(appState.availableYears, id: \.self) { year in
+                yearButton(label: "\(year)", year: year)
+            }
+        }
+    }
+
+    private func yearButton(label: String, year: Int?) -> some View {
+        let isSelected = appState.selectedYear == year
+
+        return Button(action: { appState.selectYear(year) }) {
+            Text(label)
+                .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
+                .foregroundStyle(isSelected ? .white : .secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(isSelected ? Color.accentColor : Color.clear)
+                )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Footer
@@ -187,7 +213,6 @@ struct MenuBarView: View {
 
     // MARK: - Shared Components
 
-    /// A copyable terminal command row.
     private func commandRow(_ command: String) -> some View {
         HStack(spacing: 8) {
             Text("$")
