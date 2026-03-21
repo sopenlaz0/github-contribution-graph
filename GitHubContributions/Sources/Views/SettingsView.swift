@@ -1,6 +1,6 @@
 // Sources/Views/SettingsView.swift
-// Simple settings sheet showing account info and logout.
-// Only accessible when logged in (via gear icon in the footer).
+// Inline settings panel showing account info, year selection, and logout.
+// Rendered inside the menu bar popover (not as a sheet).
 // RELEVANT FILES: Sources/State/AppState.swift, Sources/Views/MenuBarView.swift
 
 import SwiftUI
@@ -10,51 +10,101 @@ import SwiftUI
 struct SettingsView: View {
 
     @ObservedObject var appState: AppState
-    @Environment(\.dismiss) private var dismiss
+    let onDismiss: () -> Void
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             header
             accountCard
+            yearSection
+            Divider()
             actions
         }
-        .padding(20)
-        .frame(width: 320)
     }
 
     // MARK: - Header
 
     private var header: some View {
-        Text("Settings")
-            .font(.system(size: 15, weight: .semibold))
+        HStack {
+            Button(action: onDismiss) {
+                HStack(spacing: 4) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 10))
+                    Text("Back")
+                        .font(.system(size: 11))
+                }
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+
+            Spacer()
+
+            Text("Settings")
+                .font(.system(size: 13, weight: .semibold))
+
+            Spacer()
+
+            Color.clear.frame(width: 40)
+        }
     }
 
     // MARK: - Account Card
 
     private var accountCard: some View {
-        VStack(spacing: 12) {
+        HStack(spacing: 10) {
             Image(systemName: "person.crop.circle.fill")
-                .font(.system(size: 36))
+                .font(.system(size: 24))
                 .foregroundStyle(.green)
 
-            Text("@\(appState.username)")
-                .font(.system(size: 13, weight: .medium))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("@\(appState.username)")
+                    .font(.system(size: 12, weight: .medium))
 
-            Text("Authenticated via GitHub CLI")
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
+                Text("Authenticated via GitHub CLI")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+            }
+
+            Spacer()
 
             Button("Logout") {
                 appState.logout()
-                dismiss()
             }
             .buttonStyle(.plain)
-            .font(.system(size: 11))
+            .font(.system(size: 10))
             .foregroundStyle(.red)
         }
-        .frame(maxWidth: .infinity)
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 10).fill(.quaternary.opacity(0.5)))
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 8).fill(.quaternary.opacity(0.5)))
+    }
+
+    // MARK: - Year Section
+
+    private var yearSection: some View {
+        HStack {
+            Text("Time period")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            Picker("", selection: yearBinding) {
+                Text("Last 12 months").tag(nil as Int?)
+                Divider()
+                ForEach(appState.availableYears, id: \.self) { year in
+                    Text(String(year)).tag(year as Int?)
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(width: 160)
+        }
+    }
+
+    private var yearBinding: Binding<Int?> {
+        Binding(
+            get: { appState.selectedYear },
+            set: { appState.selectYear($0) }
+        )
     }
 
     // MARK: - Actions
@@ -65,13 +115,13 @@ struct SettingsView: View {
                 NSApplication.shared.terminate(nil)
             }
             .buttonStyle(.plain)
-            .font(.system(size: 11))
+            .font(.system(size: 10))
             .foregroundStyle(.secondary)
 
             Spacer()
 
             Button("Done") {
-                dismiss()
+                onDismiss()
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
