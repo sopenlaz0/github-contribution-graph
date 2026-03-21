@@ -32,8 +32,9 @@ gh auth login
 
 - **Today's count in the menu bar** — see your number without clicking
 - **Full contribution graph** — 52 weeks, GitHub's exact colors
+- **Compact month view** — switch to this month for a narrower popover
 - **Dark mode** — proper GitHub dark palette, auto-switches
-- **Year selector** — dropdown to pick a year or last 12 months
+- **Time range selector** — last 12 months, this month, or a specific year
 - **Hover details** — hover any square for count + date
 - **Today highlighted** — today's cell has a distinct border + green badge
 - **Zero config** — uses `gh auth token`, no tokens to paste
