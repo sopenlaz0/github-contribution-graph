@@ -122,6 +122,7 @@ struct MenuBarView: View {
             }
             footer
         }
+        .padding(.horizontal, compactContentInset)
     }
 
     // MARK: - Header
@@ -294,6 +295,15 @@ struct MenuBarView: View {
             return 430
         case .last12Months, .year:
             return 700
+        }
+    }
+
+    private var compactContentInset: CGFloat {
+        switch appState.selectedRange {
+        case .thisMonth:
+            return 12
+        case .last12Months, .year:
+            return 0
         }
     }
 
