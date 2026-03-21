@@ -12,13 +12,10 @@ final class AppState: ObservableObject {
 
     // MARK: - Persisted
 
-    /// OAuth App Client ID. User enters this once during initial setup.
-    @AppStorage("oauthClientId") var clientId: String = ""
-
-    /// OAuth access token. Obtained from the Device Flow.
+    /// OAuth access token from the Device Flow.
     @AppStorage("oauthToken") var token: String = ""
 
-    /// GitHub username. Fetched automatically after login.
+    /// GitHub username, fetched automatically after login.
     @AppStorage("githubUsername") var username: String = ""
 
     // MARK: - Published State
@@ -28,10 +25,10 @@ final class AppState: ObservableObject {
     @Published var errorMessage: String?
     @Published var lastUpdated: Date?
 
-    /// The device code shown to the user during OAuth login.
+    /// The one-time code shown to the user during login.
     @Published var deviceUserCode: String?
 
-    /// True while polling for OAuth authorization.
+    /// True while waiting for the user to authorize in the browser.
     @Published var isAuthorizing = false
 
     // MARK: - Private
@@ -43,20 +40,14 @@ final class AppState: ObservableObject {
 
     // MARK: - Computed
 
-    /// True when user has entered a Client ID.
-    var hasClientId: Bool {
-        !clientId.trimmingCharacters(in: .whitespaces).isEmpty
-    }
-
-    /// True when we have a valid token (user is logged in).
     var isLoggedIn: Bool {
         !token.isEmpty && !username.isEmpty
     }
 
-    // MARK: - OAuth Login
+    // MARK: - Login
 
     /// Starts the GitHub OAuth Device Flow.
-    /// Opens the browser for the user to enter a code.
+    /// Opens the browser, shows a code, and polls until authorized.
     func login() {
         authTask?.cancel()
         authTask = Task { await performLogin() }
@@ -70,7 +61,7 @@ final class AppState: ObservableObject {
         errorMessage = nil
     }
 
-    /// Logs out by clearing all stored credentials and data.
+    /// Clears all stored credentials and data.
     func logout() {
         authTask?.cancel()
         refreshTask?.cancel()
@@ -85,59 +76,45 @@ final class AppState: ObservableObject {
 
     // MARK: - Fetch Contributions
 
-    /// Fetches the contribution graph for the logged-in user.
     func fetchContributions() {
         refreshTask?.cancel()
         refreshTask = Task { await performFetch() }
     }
 
-    // MARK: - Private: Login Flow
+    // MARK: - Private: Login
 
     private func performLogin() async {
-        let trimmedClientId = clientId.trimmingCharacters(in: .whitespaces)
-        guard !trimmedClientId.isEmpty else {
-            errorMessage = "Please enter your OAuth App Client ID first."
-            return
-        }
-
         isAuthorizing = true
         errorMessage = nil
         deviceUserCode = nil
 
         do {
-            // Step 1: Request device code
-            let deviceCode = try await auth.requestDeviceCode(clientId: trimmedClientId)
-
+            // 1. Request a device code
+            let deviceCode = try await auth.requestDeviceCode()
             guard !Task.isCancelled else { return }
 
-            // Step 2: Show the code to the user and open browser
+            // 2. Show the code and open the browser
             deviceUserCode = deviceCode.userCode
-
             if let url = URL(string: deviceCode.verificationUri) {
                 NSWorkspace.shared.open(url)
             }
 
-            // Step 3: Poll until user authorizes
+            // 3. Poll until the user authorizes
             let accessToken = try await auth.pollForToken(
-                clientId: trimmedClientId,
                 deviceCode: deviceCode.deviceCode,
                 interval: deviceCode.interval
             )
-
             guard !Task.isCancelled else { return }
 
-            // Step 4: Fetch username with the new token
+            // 4. Get the username
             let fetchedUsername = try await service.fetchUsername(token: accessToken)
-
             guard !Task.isCancelled else { return }
 
-            // Step 5: Store credentials
+            // 5. Done — store and load
             token = accessToken
             username = fetchedUsername
             isAuthorizing = false
             deviceUserCode = nil
-
-            // Step 6: Load the contribution graph
             fetchContributions()
 
         } catch is CancellationError {
@@ -160,10 +137,8 @@ final class AppState: ObservableObject {
 
         do {
             let result = try await service.fetchContributions(
-                username: username,
-                token: token
+                username: username, token: token
             )
-
             guard !Task.isCancelled else { return }
 
             calendar = result
@@ -171,7 +146,6 @@ final class AppState: ObservableObject {
         } catch {
             guard !Task.isCancelled else { return }
 
-            // If we get a 401, the token is probably expired
             if let ghError = error as? GitHubError, case .httpError(401) = ghError {
                 errorMessage = "Session expired. Please log in again."
                 logout()

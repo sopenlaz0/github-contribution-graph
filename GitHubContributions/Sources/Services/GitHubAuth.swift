@@ -5,21 +5,30 @@
 
 import Foundation
 
+// MARK: - Configuration
+
+/// Your GitHub OAuth App's Client ID.
+/// Replace this with your own before building:
+///   1. Go to github.com/settings/developers
+///   2. Create a new OAuth App (any name/URL)
+///   3. Enable "Device Flow"
+///   4. Paste the Client ID here
+let kGitHubClientId = "YOUR_CLIENT_ID_HERE"
+
 // MARK: - GitHub Auth Service
 
-/// Handles the GitHub OAuth Device Flow.
+/// Handles the GitHub OAuth Device Flow — same flow that `gh` CLI uses.
 ///
-/// Flow:
 /// 1. Request a device code from GitHub
-/// 2. Show the user a code and open the verification URL
-/// 3. Poll GitHub until the user authorizes (or times out)
+/// 2. Show the user a one-time code and open the browser
+/// 3. Poll until the user authorizes
 /// 4. Return the access token
 final class GitHubAuth {
 
     // MARK: - Device Code Request
 
-    /// Kicks off the Device Flow by requesting a device code from GitHub.
-    func requestDeviceCode(clientId: String) async throws -> DeviceCodeResponse {
+    /// Kicks off the Device Flow. Returns a code the user enters in their browser.
+    func requestDeviceCode() async throws -> DeviceCodeResponse {
         let url = URL(string: "https://github.com/login/device/code")!
 
         var request = URLRequest(url: url)
@@ -27,7 +36,7 @@ final class GitHubAuth {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
 
-        let body = "client_id=\(clientId)&scope=read:user"
+        let body = "client_id=\(kGitHubClientId)&scope=read:user"
         request.httpBody = body.data(using: .utf8)
 
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -41,15 +50,13 @@ final class GitHubAuth {
 
     // MARK: - Poll for Token
 
-    /// Polls GitHub until the user authorizes the app (or the code expires).
-    /// Returns the access token on success.
-    func pollForToken(clientId: String, deviceCode: String, interval: Int) async throws -> String {
+    /// Polls GitHub until the user authorizes (or the code expires).
+    func pollForToken(deviceCode: String, interval: Int) async throws -> String {
         let url = URL(string: "https://github.com/login/oauth/access_token")!
         var pollInterval = max(interval, 5)
 
         while true {
             try await Task.sleep(nanoseconds: UInt64(pollInterval) * 1_000_000_000)
-
             try Task.checkCancellation()
 
             var request = URLRequest(url: url)
@@ -57,18 +64,16 @@ final class GitHubAuth {
             request.setValue("application/json", forHTTPHeaderField: "Accept")
             request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
 
-            let body = "client_id=\(clientId)&device_code=\(deviceCode)&grant_type=urn:ietf:params:oauth:grant-type:device_code"
+            let body = "client_id=\(kGitHubClientId)&device_code=\(deviceCode)&grant_type=urn:ietf:params:oauth:grant-type:device_code"
             request.httpBody = body.data(using: .utf8)
 
             let (data, _) = try await URLSession.shared.data(for: request)
             let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
 
-            // Success — we got a token
             if let accessToken = tokenResponse.accessToken {
                 return accessToken
             }
 
-            // Handle polling errors
             switch tokenResponse.error {
             case "authorization_pending":
                 continue
@@ -129,7 +134,7 @@ enum AuthError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .deviceCodeRequestFailed:
-            return "Failed to start the login flow. Check your Client ID."
+            return "Failed to start login. Make sure the Client ID is configured."
         case .codeExpired:
             return "The login code expired. Please try again."
         case .accessDenied:
