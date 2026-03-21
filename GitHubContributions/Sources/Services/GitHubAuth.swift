@@ -1,142 +1,124 @@
 // Sources/Services/GitHubAuth.swift
-// GitHub OAuth Device Flow implementation for desktop login.
-// User clicks "Login", enters a code in their browser, and we get a token.
+// Uses the `gh` CLI to authenticate — piggybacks on existing `gh auth login`.
+// Zero config: if `gh` is already logged in, we just grab the token.
 // RELEVANT FILES: Sources/State/AppState.swift, Sources/Services/GitHubService.swift
 
 import Foundation
 
-// MARK: - Configuration
+// MARK: - GitHub Auth (via `gh` CLI)
 
-/// Hardcoded Client ID — replace with your own to ship a pre-configured build.
-/// If left as the placeholder, the app will prompt for it at runtime (stored once).
-let kGitHubClientIdDefault = "YOUR_CLIENT_ID_HERE"
-
-// MARK: - GitHub Auth Service
-
-/// Handles the GitHub OAuth Device Flow — same flow that `gh` CLI uses.
-///
-/// 1. Request a device code from GitHub
-/// 2. Show the user a one-time code and open the browser
-/// 3. Poll until the user authorizes
-/// 4. Return the access token
+/// Grabs the auth token from the `gh` CLI that's already installed on the user's machine.
+/// No OAuth apps, no Client IDs, no tokens to paste. Just `gh auth token`.
 final class GitHubAuth {
 
-    // MARK: - Device Code Request
-
-    /// Kicks off the Device Flow. Returns a code the user enters in their browser.
-    func requestDeviceCode(clientId: String) async throws -> DeviceCodeResponse {
-        let url = URL(string: "https://github.com/login/device/code")!
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-
-        let body = "client_id=\(clientId)&scope=read:user"
-        request.httpBody = body.data(using: .utf8)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            throw AuthError.deviceCodeRequestFailed
+    /// Returns the OAuth token from the user's `gh` CLI session.
+    func getToken() async throws -> String {
+        let output = try await runGH(["auth", "token"])
+        guard !output.isEmpty else {
+            throw AuthError.notAuthenticated
         }
-
-        return try JSONDecoder().decode(DeviceCodeResponse.self, from: data)
+        return output
     }
 
-    // MARK: - Poll for Token
+    /// Checks whether `gh` is installed and reachable.
+    func isInstalled() -> Bool {
+        findGHPath() != nil
+    }
 
-    /// Polls GitHub until the user authorizes (or the code expires).
-    func pollForToken(clientId: String, deviceCode: String, interval: Int) async throws -> String {
-        let url = URL(string: "https://github.com/login/oauth/access_token")!
-        var pollInterval = max(interval, 5)
+    /// Returns a human-readable auth status string.
+    func getAuthStatus() async -> String? {
+        try? await runGH(["auth", "status"])
+    }
 
-        while true {
-            try await Task.sleep(nanoseconds: UInt64(pollInterval) * 1_000_000_000)
-            try Task.checkCancellation()
+    // MARK: - Process Execution
 
-            var request = URLRequest(url: url)
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Accept")
-            request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-
-            let body = "client_id=\(clientId)&device_code=\(deviceCode)&grant_type=urn:ietf:params:oauth:grant-type:device_code"
-            request.httpBody = body.data(using: .utf8)
-
-            let (data, _) = try await URLSession.shared.data(for: request)
-            let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
-
-            if let accessToken = tokenResponse.accessToken {
-                return accessToken
-            }
-
-            switch tokenResponse.error {
-            case "authorization_pending":
-                continue
-            case "slow_down":
-                pollInterval += 5
-                continue
-            case "expired_token":
-                throw AuthError.codeExpired
-            case "access_denied":
-                throw AuthError.accessDenied
-            default:
-                throw AuthError.unknown(tokenResponse.error ?? "Unknown error")
+    private func runGH(_ args: [String]) async throws -> String {
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let result = self.execute(args)
+                continuation.resume(with: result)
             }
         }
     }
-}
 
-// MARK: - Response Models
+    private func execute(_ args: [String]) -> Result<String, AuthError> {
+        guard let ghPath = findGHPath() else {
+            return .failure(.ghNotInstalled)
+        }
 
-struct DeviceCodeResponse: Codable {
-    let deviceCode: String
-    let userCode: String
-    let verificationUri: String
-    let expiresIn: Int
-    let interval: Int
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: ghPath)
+        process.arguments = args
 
-    enum CodingKeys: String, CodingKey {
-        case deviceCode = "device_code"
-        case userCode = "user_code"
-        case verificationUri = "verification_uri"
-        case expiresIn = "expires_in"
-        case interval
+        // Ensure gh can find its config and dependencies
+        var env = ProcessInfo.processInfo.environment
+        let extraPaths = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+        env["PATH"] = extraPaths + ":" + (env["PATH"] ?? "")
+        process.environment = env
+
+        let stdout = Pipe()
+        let stderr = Pipe()
+        process.standardOutput = stdout
+        process.standardError = stderr
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            return .failure(.ghNotInstalled)
+        }
+
+        let outData = stdout.fileHandleForReading.readDataToEndOfFile()
+        let output = String(data: outData, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        if process.terminationStatus == 0 {
+            return .success(output)
+        } else {
+            return .failure(.notAuthenticated)
+        }
     }
-}
 
-struct TokenResponse: Codable {
-    let accessToken: String?
-    let tokenType: String?
-    let scope: String?
-    let error: String?
+    // MARK: - Find `gh` Binary
 
-    enum CodingKeys: String, CodingKey {
-        case accessToken = "access_token"
-        case tokenType = "token_type"
-        case scope
-        case error
+    /// Checks common install locations for the `gh` binary.
+    private func findGHPath() -> String? {
+        let candidates = [
+            "/opt/homebrew/bin/gh",
+            "/usr/local/bin/gh",
+            "/usr/bin/gh",
+            "/run/current-system/sw/bin/gh",
+        ]
+
+        for path in candidates {
+            if FileManager.default.isExecutableFile(atPath: path) {
+                return path
+            }
+        }
+
+        // Last resort: check user's home .nix-profile
+        let homeNix = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".nix-profile/bin/gh").path
+        if FileManager.default.isExecutableFile(atPath: homeNix) {
+            return homeNix
+        }
+
+        return nil
     }
 }
 
 // MARK: - Auth Errors
 
 enum AuthError: LocalizedError {
-    case deviceCodeRequestFailed
-    case codeExpired
-    case accessDenied
-    case unknown(String)
+    case ghNotInstalled
+    case notAuthenticated
 
     var errorDescription: String? {
         switch self {
-        case .deviceCodeRequestFailed:
-            return "Failed to start login. Make sure the Client ID is configured."
-        case .codeExpired:
-            return "The login code expired. Please try again."
-        case .accessDenied:
-            return "Access was denied. Please try again."
-        case .unknown(let msg):
-            return "Login error: \(msg)"
+        case .ghNotInstalled:
+            return "GitHub CLI (gh) is not installed."
+        case .notAuthenticated:
+            return "Not logged in. Run `gh auth login` in your terminal."
         }
     }
 }
