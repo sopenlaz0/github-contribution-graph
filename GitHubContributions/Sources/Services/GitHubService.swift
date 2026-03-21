@@ -7,7 +7,6 @@ import Foundation
 
 // MARK: - GitHub Service
 
-/// Fetches data from GitHub's APIs using an OAuth access token.
 final class GitHubService {
 
     private let graphQLEndpoint = URL(string: "https://api.github.com/graphql")!
@@ -34,10 +33,10 @@ final class GitHubService {
 
     // MARK: - Fetch Contributions
 
-    /// Fetches the contribution calendar. Pass `year` to get a specific year, or nil for the last 12 months.
+    /// Fetches the contribution calendar. Pass `year` for a specific year, or nil for the last 12 months.
     func fetchContributions(username: String, token: String, year: Int? = nil) async throws -> ContributionCalendar {
-        let query = buildQuery(username: username, year: year)
-        let body: [String: Any] = ["query": query]
+        let (query, variables) = buildQuery(username: username, year: year)
+        let body: [String: Any] = ["query": query, "variables": variables]
 
         var request = URLRequest(url: graphQLEndpoint)
         request.httpMethod = "POST"
@@ -70,32 +69,42 @@ final class GitHubService {
 
     // MARK: - Private
 
-    private func buildQuery(username: String, year: Int?) -> String {
-        let collectionArgs: String
-        if let year = year {
-            collectionArgs = "(from: \"\(year)-01-01T00:00:00Z\", to: \"\(year)-12-31T23:59:59Z\")"
-        } else {
-            collectionArgs = ""
-        }
+    /// Uses GraphQL variables to avoid injection via username.
+    private func buildQuery(username: String, year: Int?) -> (String, [String: Any]) {
+        var variables: [String: Any] = ["login": username]
 
-        return """
-        query {
-          user(login: "\(username)") {
-            contributionsCollection\(collectionArgs) {
-              contributionCalendar {
-                totalContributions
-                weeks {
-                  contributionDays {
-                    contributionCount
-                    date
-                    color
+        let query: String
+        if let year = year {
+            variables["from"] = "\(year)-01-01T00:00:00Z"
+            variables["to"] = "\(year)-12-31T23:59:59Z"
+            query = """
+            query($login: String!, $from: DateTime!, $to: DateTime!) {
+              user(login: $login) {
+                contributionsCollection(from: $from, to: $to) {
+                  contributionCalendar {
+                    totalContributions
+                    weeks { contributionDays { contributionCount date color } }
                   }
                 }
               }
             }
-          }
+            """
+        } else {
+            query = """
+            query($login: String!) {
+              user(login: $login) {
+                contributionsCollection {
+                  contributionCalendar {
+                    totalContributions
+                    weeks { contributionDays { contributionCount date color } }
+                  }
+                }
+              }
+            }
+            """
         }
-        """
+
+        return (query, variables)
     }
 }
 

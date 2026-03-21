@@ -32,12 +32,25 @@ enum GitHubColors {
 struct ContributionGraphView: View {
 
     let calendar: ContributionCalendar
+    var todayId: String = ""
 
     @Environment(\.colorScheme) private var colorScheme
-    @State private var hoveredDay: ContributionDay?
+    @State private var hoveredDayId: String?
 
     private let cellSize: CGFloat = 10
     private let cellSpacing: CGFloat = 3
+
+    /// Pre-computed lookup for fast hover info display.
+    private var dayLookup: [String: ContributionDay] {
+        var dict = [String: ContributionDay]()
+        dict.reserveCapacity(calendar.weeks.count * 7)
+        for week in calendar.weeks {
+            for day in week.contributionDays {
+                dict[day.id] = day
+            }
+        }
+        return dict
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -74,7 +87,16 @@ struct ContributionGraphView: View {
                 ForEach(calendar.weeks) { week in
                     VStack(spacing: cellSpacing) {
                         ForEach(week.contributionDays) { day in
-                            contributionCell(day)
+                            ContributionCellView(
+                                day: day,
+                                isHovered: hoveredDayId == day.id,
+                                isToday: day.id == todayId,
+                                fillColor: GitHubColors.color(for: day.color, scheme: colorScheme),
+                                cellSize: cellSize,
+                                onHover: { hovered in
+                                    hoveredDayId = hovered ? day.id : nil
+                                }
+                            )
                         }
                     }
                 }
@@ -82,30 +104,12 @@ struct ContributionGraphView: View {
         }
     }
 
-    private func contributionCell(_ day: ContributionDay) -> some View {
-        let isHovered = hoveredDay?.id == day.id
-
-        return RoundedRectangle(cornerRadius: 2)
-            .fill(GitHubColors.color(for: day.color, scheme: colorScheme))
-            .frame(width: cellSize, height: cellSize)
-            .overlay(
-                RoundedRectangle(cornerRadius: 2)
-                    .strokeBorder(.primary.opacity(0.5), lineWidth: 1)
-                    .opacity(isHovered ? 1 : 0)
-            )
-            .onHover { hovered in
-                hoveredDay = hovered ? day : nil
-            }
-            .help(tooltipText(for: day))
-    }
-
     // MARK: - Hover Info Bar
 
-    /// Shows contribution info for the hovered day, like GitHub does.
     private var hoverInfo: some View {
         Group {
-            if let day = hoveredDay {
-                Text(tooltipText(for: day))
+            if let id = hoveredDayId, let day = dayLookup[id] {
+                Text(Self.tooltipText(for: day))
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             } else {
@@ -114,7 +118,6 @@ struct ContributionGraphView: View {
             }
         }
         .frame(height: 14)
-        .animation(.none, value: hoveredDay?.id)
     }
 
     // MARK: - Day Labels
@@ -138,25 +141,29 @@ struct ContributionGraphView: View {
 
     // MARK: - Tooltip
 
-    private func tooltipText(for day: ContributionDay) -> String {
+    static func tooltipText(for day: ContributionDay) -> String {
         let count = day.contributionCount
         let countText = count == 0 ? "No contributions" : "\(count) contribution\(count == 1 ? "" : "s")"
 
-        guard let date = Self.dateParser.date(from: day.date) else {
+        guard let date = dateParser.date(from: day.date) else {
             return "\(countText) on \(day.date)"
         }
-        return "\(countText) on \(Self.tooltipFormatter.string(from: date))"
+        return "\(countText) on \(tooltipFormatter.string(from: date))"
     }
 
-    private static let dateParser: DateFormatter = {
+    static let dateParser: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
         return f
     }()
 
     private static let tooltipFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "EEEE, MMMM d, yyyy"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
         return f
     }()
 
@@ -200,6 +207,53 @@ struct ContributionGraphView: View {
 
         return result
     }
+}
+
+// MARK: - Contribution Cell
+
+/// Separate View struct so SwiftUI only redraws the 2 cells that change on hover,
+/// not the entire 365-cell grid.
+struct ContributionCellView: View {
+    let day: ContributionDay
+    let isHovered: Bool
+    let isToday: Bool
+    let fillColor: Color
+    let cellSize: CGFloat
+    let onHover: (Bool) -> Void
+
+    @State private var isCursorPushed = false
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 2)
+            .fill(fillColor)
+            .frame(width: cellSize, height: cellSize)
+            .overlay(
+                RoundedRectangle(cornerRadius: 2)
+                    .strokeBorder(borderColor, lineWidth: borderWidth)
+                    .opacity(showBorder ? 1 : 0)
+            )
+            .onHover { hovered in
+                if hovered && !isCursorPushed {
+                    NSCursor.pointingHand.push()
+                    isCursorPushed = true
+                } else if !hovered && isCursorPushed {
+                    NSCursor.pop()
+                    isCursorPushed = false
+                }
+                onHover(hovered)
+            }
+            .onDisappear {
+                if isCursorPushed {
+                    NSCursor.pop()
+                    isCursorPushed = false
+                }
+            }
+            .help(ContributionGraphView.tooltipText(for: day))
+    }
+
+    private var showBorder: Bool { isHovered || isToday }
+    private var borderColor: Color { isToday ? .white : .primary.opacity(0.5) }
+    private var borderWidth: CGFloat { isToday ? 1.5 : 1 }
 }
 
 // MARK: - Legend
