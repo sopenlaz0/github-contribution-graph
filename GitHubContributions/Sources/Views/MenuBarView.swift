@@ -163,22 +163,26 @@ struct MenuBarView: View {
     // MARK: - Year Dropdown
 
     private var yearDropdown: some View {
-        Picker("", selection: yearBinding) {
-            Text("Last 12 months").tag(nil as Int?)
+        Menu {
+            Button("Last 12 months") { appState.selectYear(nil) }
             Divider()
             ForEach(appState.availableYears, id: \.self) { year in
-                Text(String(year)).tag(year as Int?)
+                Button(String(year)) { appState.selectYear(year) }
             }
+        } label: {
+            HStack(spacing: 3) {
+                Text(appState.selectedYear.map(String.init) ?? "Last 12 months")
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 7))
+            }
+            .font(.system(size: 11))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(RoundedRectangle(cornerRadius: 5).fill(.quaternary.opacity(0.5)))
         }
-        .pickerStyle(.menu)
-        .frame(width: 150)
-    }
-
-    private var yearBinding: Binding<Int?> {
-        Binding(
-            get: { appState.selectedYear },
-            set: { appState.selectYear($0) }
-        )
+        .menuStyle(.borderlessButton)
+        .fixedSize()
     }
 
     // MARK: - Footer
@@ -283,15 +287,9 @@ struct MenuBarView: View {
 
     private func dataErrorView(_ message: String) -> some View {
         VStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 24)).foregroundStyle(.orange)
-            Text(message)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            Button("Retry") { appState.fetchContributions() }
-                .buttonStyle(.borderedProminent).controlSize(.small)
-        }
-        .frame(height: 120)
+            Image(systemName: "exclamationmark.triangle").font(.system(size: 24)).foregroundStyle(.orange)
+            Text(message).font(.system(size: 11)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            Button("Retry") { appState.fetchContributions() }.buttonStyle(.borderedProminent).controlSize(.small)
+        }.frame(height: 120)
     }
 }
