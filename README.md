@@ -11,7 +11,7 @@ A minimal macOS menu bar app that shows your GitHub contribution graph. Glance a
 
 ## Download
 
-Grab the latest `.zip` from [Releases](../../releases), unzip, drag `GitHubContributions.app` to `/Applications`.
+Grab the latest `.dmg` or `.zip` from [Releases](../../releases), then move `GitHubContributions.app` to `/Applications`.
 
 > On first launch, macOS may block it. Right-click → Open → Open to bypass Gatekeeper.
 
@@ -62,7 +62,7 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-GitHub Actions builds on macOS 14, zips the `.app`, and publishes a Release.
+GitHub Actions builds on macOS 15 with Xcode 16.2, packages both a DMG and ZIP, and publishes a Release.
 
 ## Project Structure
 
