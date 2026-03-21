@@ -1,0 +1,6 @@
+.DS_Store
+build/
+build-generated/
+GitHubContributions.xcodeproj/
+GitHubContributions/*.xcodeproj/
+GitHubContributions/**/*.xcuserdatad/
