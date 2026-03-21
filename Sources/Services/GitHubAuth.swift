@@ -20,7 +20,7 @@ final class GitHubAuth {
 
     /// Checks whether `gh` is installed and reachable.
     func isInstalled() -> Bool {
-        findGHPath() != nil
+        Self.findGHPath() != nil
     }
 
     // MARK: - Process Execution
@@ -28,13 +28,13 @@ final class GitHubAuth {
     private func runGH(_ args: [String]) async throws -> String {
         try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
-                let result = self.execute(args)
+                let result = Self.execute(args)
                 continuation.resume(with: result)
             }
         }
     }
 
-    private func execute(_ args: [String]) -> Result<String, AuthError> {
+    private static func execute(_ args: [String]) -> Result<String, AuthError> {
         guard let ghPath = findGHPath() else {
             return .failure(.ghNotInstalled)
         }
@@ -83,7 +83,7 @@ final class GitHubAuth {
 
     // MARK: - Find `gh` Binary
 
-    private func findGHPath() -> String? {
+    private static func findGHPath() -> String? {
         let candidates = [
             "/opt/homebrew/bin/gh",
             "/usr/local/bin/gh",
