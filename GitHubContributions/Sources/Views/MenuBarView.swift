@@ -1,6 +1,6 @@
 // Sources/Views/MenuBarView.swift
 // Main popover view shown when clicking the menu bar icon.
-// Displays the contribution graph, stats, and quick actions.
+// Handles the full flow: setup → login → contribution graph.
 // RELEVANT FILES: Sources/Views/ContributionGraphView.swift, Sources/State/AppState.swift
 
 import SwiftUI
@@ -15,22 +15,20 @@ struct MenuBarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !appState.isConfigured {
-                onboardingView
-            } else if let calendar = appState.calendar {
-                contributionView(calendar)
-            } else if appState.isLoading {
-                loadingView
-            } else if let error = appState.errorMessage {
-                errorView(error)
+            if !appState.hasClientId {
+                setupView
+            } else if appState.isAuthorizing {
+                authorizingView
+            } else if appState.isLoggedIn {
+                loggedInContent
             } else {
-                loadingView
+                loginView
             }
         }
         .frame(width: 620)
         .padding(16)
         .onAppear {
-            if appState.isConfigured && appState.calendar == nil {
+            if appState.isLoggedIn && appState.calendar == nil {
                 appState.fetchContributions()
             }
         }
@@ -39,14 +37,27 @@ struct MenuBarView: View {
         }
     }
 
+    // MARK: - Logged In Content
+
+    @ViewBuilder
+    private var loggedInContent: some View {
+        if let calendar = appState.calendar {
+            contributionView(calendar)
+        } else if appState.isLoading {
+            loadingView
+        } else if let error = appState.errorMessage {
+            errorView(error)
+        } else {
+            loadingView
+        }
+    }
+
     // MARK: - Contribution View
 
     private func contributionView(_ calendar: ContributionCalendar) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             header(totalContributions: calendar.totalContributions)
-
             ContributionGraphView(calendar: calendar)
-
             footer
         }
     }
@@ -97,9 +108,7 @@ struct MenuBarView: View {
             .buttonStyle(.plain)
             .padding(.leading, 4)
 
-            Button(action: {
-                NSApplication.shared.terminate(nil)
-            }) {
+            Button(action: { NSApplication.shared.terminate(nil) }) {
                 Image(systemName: "power")
                     .font(.system(size: 11))
             }
@@ -109,27 +118,106 @@ struct MenuBarView: View {
         }
     }
 
-    // MARK: - Onboarding
+    // MARK: - Setup View (First Time — No Client ID)
 
-    private var onboardingView: some View {
+    private var setupView: some View {
         VStack(spacing: 12) {
-            Image(systemName: "person.crop.circle.badge.questionmark")
-                .font(.system(size: 32))
+            Image(systemName: "key.fill")
+                .font(.system(size: 28))
                 .foregroundStyle(.secondary)
 
-            Text("Welcome to GitHub Contributions")
+            Text("One-Time Setup")
                 .font(.system(size: 13, weight: .semibold))
 
-            Text("Add your GitHub username and a Personal Access Token\nto see your contribution graph.")
+            Text("Create a GitHub OAuth App to enable login.\nTakes about 30 seconds.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
-            Button("Open Settings") {
+            Button("Setup") {
                 showSettings = true
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
+        }
+        .padding(.vertical, 8)
+    }
+
+    // MARK: - Login View (Has Client ID, Not Logged In)
+
+    private var loginView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "person.crop.circle")
+                .font(.system(size: 28))
+                .foregroundStyle(.secondary)
+
+            Text("GitHub Contributions")
+                .font(.system(size: 13, weight: .semibold))
+
+            if let error = appState.errorMessage {
+                Text(error)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+            }
+
+            Button(action: { appState.login() }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.right.circle.fill")
+                    Text("Login with GitHub")
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+
+            HStack {
+                Button(action: { showSettings = true }) {
+                    Text("Settings")
+                        .font(.system(size: 10))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 8)
+    }
+
+    // MARK: - Authorizing View (Device Flow In Progress)
+
+    private var authorizingView: some View {
+        VStack(spacing: 12) {
+            Text("Enter this code on GitHub:")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+
+            if let code = appState.deviceUserCode {
+                Text(code)
+                    .font(.system(size: 28, weight: .bold, design: .monospaced))
+                    .textSelection(.enabled)
+
+                Button("Copy Code") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(code, forType: .string)
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 6) {
+                ProgressView()
+                    .scaleEffect(0.6)
+                Text("Waiting for authorization...")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+
+            Button("Cancel") {
+                appState.cancelLogin()
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 10))
+            .foregroundStyle(.secondary)
         }
         .padding(.vertical, 8)
     }
