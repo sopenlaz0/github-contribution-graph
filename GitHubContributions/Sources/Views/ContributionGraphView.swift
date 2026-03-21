@@ -34,7 +34,7 @@ struct ContributionGraphView: View {
     let calendar: ContributionCalendar
 
     @Environment(\.colorScheme) private var colorScheme
-    @State private var hoveredDay: ContributionDay?
+    @State private var hoveredDayId: String?
 
     private let cellSize: CGFloat = 10
     private let cellSpacing: CGFloat = 3
@@ -74,7 +74,15 @@ struct ContributionGraphView: View {
                 ForEach(calendar.weeks) { week in
                     VStack(spacing: cellSpacing) {
                         ForEach(week.contributionDays) { day in
-                            contributionCell(day)
+                            ContributionCellView(
+                                day: day,
+                                isHovered: hoveredDayId == day.id,
+                                fillColor: GitHubColors.color(for: day.color, scheme: colorScheme),
+                                cellSize: cellSize,
+                                onHover: { hovered in
+                                    hoveredDayId = hovered ? day.id : nil
+                                }
+                            )
                         }
                     }
                 }
@@ -82,30 +90,12 @@ struct ContributionGraphView: View {
         }
     }
 
-    private func contributionCell(_ day: ContributionDay) -> some View {
-        let isHovered = hoveredDay?.id == day.id
-
-        return RoundedRectangle(cornerRadius: 2)
-            .fill(GitHubColors.color(for: day.color, scheme: colorScheme))
-            .frame(width: cellSize, height: cellSize)
-            .overlay(
-                RoundedRectangle(cornerRadius: 2)
-                    .strokeBorder(.primary.opacity(0.5), lineWidth: 1)
-                    .opacity(isHovered ? 1 : 0)
-            )
-            .onHover { hovered in
-                hoveredDay = hovered ? day : nil
-            }
-            .help(tooltipText(for: day))
-    }
-
     // MARK: - Hover Info Bar
 
-    /// Shows contribution info for the hovered day, like GitHub does.
     private var hoverInfo: some View {
         Group {
-            if let day = hoveredDay {
-                Text(tooltipText(for: day))
+            if let id = hoveredDayId, let day = findDay(by: id) {
+                Text(Self.tooltipText(for: day))
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             } else {
@@ -114,7 +104,15 @@ struct ContributionGraphView: View {
             }
         }
         .frame(height: 14)
-        .animation(.none, value: hoveredDay?.id)
+    }
+
+    private func findDay(by id: String) -> ContributionDay? {
+        for week in calendar.weeks {
+            if let day = week.contributionDays.first(where: { $0.id == id }) {
+                return day
+            }
+        }
+        return nil
     }
 
     // MARK: - Day Labels
@@ -136,19 +134,19 @@ struct ContributionGraphView: View {
         .padding(.trailing, 4)
     }
 
-    // MARK: - Tooltip
+    // MARK: - Tooltip (shared with ContributionCellView)
 
-    private func tooltipText(for day: ContributionDay) -> String {
+    static func tooltipText(for day: ContributionDay) -> String {
         let count = day.contributionCount
         let countText = count == 0 ? "No contributions" : "\(count) contribution\(count == 1 ? "" : "s")"
 
-        guard let date = Self.dateParser.date(from: day.date) else {
+        guard let date = dateParser.date(from: day.date) else {
             return "\(countText) on \(day.date)"
         }
-        return "\(countText) on \(Self.tooltipFormatter.string(from: date))"
+        return "\(countText) on \(tooltipFormatter.string(from: date))"
     }
 
-    private static let dateParser: DateFormatter = {
+    static let dateParser: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
         return f
@@ -199,6 +197,38 @@ struct ContributionGraphView: View {
         }
 
         return result
+    }
+}
+
+// MARK: - Contribution Cell (separate view for hover performance)
+
+/// Each cell is its own View so SwiftUI only redraws the hovered/unhovered cells,
+/// not the entire 365-cell grid on every hover change.
+struct ContributionCellView: View {
+    let day: ContributionDay
+    let isHovered: Bool
+    let fillColor: Color
+    let cellSize: CGFloat
+    let onHover: (Bool) -> Void
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 2)
+            .fill(fillColor)
+            .frame(width: cellSize, height: cellSize)
+            .overlay(
+                RoundedRectangle(cornerRadius: 2)
+                    .strokeBorder(.primary.opacity(0.5), lineWidth: 1)
+                    .opacity(isHovered ? 1 : 0)
+            )
+            .onHover { hovered in
+                if hovered {
+                    NSCursor.pointingHand.push()
+                } else {
+                    NSCursor.pop()
+                }
+                onHover(hovered)
+            }
+            .help(ContributionGraphView.tooltipText(for: day))
     }
 }
 
