@@ -1,13 +1,12 @@
 // Sources/Views/ContributionGraphView.swift
 // Renders the GitHub-style contribution grid (green squares).
-// Supports dark mode with GitHub's exact color palette.
+// Supports dark mode, hover info, and GitHub's exact color palette.
 // RELEVANT FILES: Sources/Models/ContributionModels.swift, Sources/Views/MenuBarView.swift
 
 import SwiftUI
 
 // MARK: - GitHub Color Palette
 
-/// Maps GitHub's light-mode API colors to their dark-mode equivalents.
 enum GitHubColors {
     private static let lightToDark: [String: String] = [
         "#ebedf0": "#161b22",
@@ -35,14 +34,16 @@ struct ContributionGraphView: View {
     let calendar: ContributionCalendar
 
     @Environment(\.colorScheme) private var colorScheme
+    @State private var hoveredDay: ContributionDay?
 
     private let cellSize: CGFloat = 10
     private let cellSpacing: CGFloat = 3
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 4) {
             monthLabels
             graphGrid
+            hoverInfo
         }
     }
 
@@ -73,15 +74,47 @@ struct ContributionGraphView: View {
                 ForEach(calendar.weeks) { week in
                     VStack(spacing: cellSpacing) {
                         ForEach(week.contributionDays) { day in
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(GitHubColors.color(for: day.color, scheme: colorScheme))
-                                .frame(width: cellSize, height: cellSize)
-                                .help(tooltipText(for: day))
+                            contributionCell(day)
                         }
                     }
                 }
             }
         }
+    }
+
+    private func contributionCell(_ day: ContributionDay) -> some View {
+        let isHovered = hoveredDay?.id == day.id
+
+        return RoundedRectangle(cornerRadius: 2)
+            .fill(GitHubColors.color(for: day.color, scheme: colorScheme))
+            .frame(width: cellSize, height: cellSize)
+            .overlay(
+                RoundedRectangle(cornerRadius: 2)
+                    .strokeBorder(.primary.opacity(0.5), lineWidth: 1)
+                    .opacity(isHovered ? 1 : 0)
+            )
+            .onHover { hovered in
+                hoveredDay = hovered ? day : nil
+            }
+            .help(tooltipText(for: day))
+    }
+
+    // MARK: - Hover Info Bar
+
+    /// Shows contribution info for the hovered day, like GitHub does.
+    private var hoverInfo: some View {
+        Group {
+            if let day = hoveredDay {
+                Text(tooltipText(for: day))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            } else {
+                Text(" ")
+                    .font(.system(size: 10))
+            }
+        }
+        .frame(height: 14)
+        .animation(.none, value: hoveredDay?.id)
     }
 
     // MARK: - Day Labels
@@ -105,7 +138,6 @@ struct ContributionGraphView: View {
 
     // MARK: - Tooltip
 
-    /// Formats the tooltip like GitHub: "5 contributions on Friday, March 21, 2026"
     private func tooltipText(for day: ContributionDay) -> String {
         let count = day.contributionCount
         let countText = count == 0 ? "No contributions" : "\(count) contribution\(count == 1 ? "" : "s")"

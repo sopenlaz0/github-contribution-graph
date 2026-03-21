@@ -1,6 +1,6 @@
 // Sources/Views/MenuBarView.swift
 // Main popover view shown when clicking the menu bar icon.
-// Shows the contribution graph with year selector, or setup instructions.
+// Shows contribution graph with year dropdown, or setup instructions.
 // RELEVANT FILES: Sources/Views/ContributionGraphView.swift, Sources/State/AppState.swift
 
 import SwiftUI
@@ -15,17 +15,10 @@ struct MenuBarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            switch appState.authStatus {
-            case .checking:
-                checkingView
-            case .loggedIn:
-                loggedInContent
-            case .needsGH:
-                needsGHView
-            case .needsLogin:
-                needsLoginView
-            case .error(let message):
-                errorView(message)
+            if showSettings && appState.isLoggedIn {
+                SettingsView(appState: appState, onDismiss: { showSettings = false })
+            } else {
+                mainContent
             }
         }
         .frame(width: 700)
@@ -37,8 +30,23 @@ struct MenuBarView: View {
                 appState.fetchContributions()
             }
         }
-        .sheet(isPresented: $showSettings) {
-            SettingsView(appState: appState)
+    }
+
+    // MARK: - Main Content
+
+    @ViewBuilder
+    private var mainContent: some View {
+        switch appState.authStatus {
+        case .checking:
+            checkingView
+        case .loggedIn:
+            loggedInContent
+        case .needsGH:
+            needsGHView
+        case .needsLogin:
+            needsLoginView
+        case .error(let message):
+            errorView(message)
         }
     }
 
@@ -139,7 +147,7 @@ struct MenuBarView: View {
 
             Spacer()
 
-            yearPicker
+            yearDropdown
 
             Button(action: { appState.fetchContributions() }) {
                 Image(systemName: "arrow.clockwise")
@@ -148,36 +156,29 @@ struct MenuBarView: View {
             .buttonStyle(.plain)
             .disabled(appState.isLoading)
             .opacity(appState.isLoading ? 0.5 : 1)
-            .padding(.leading, 6)
+            .padding(.leading, 4)
         }
     }
 
-    // MARK: - Year Picker
+    // MARK: - Year Dropdown
 
-    private var yearPicker: some View {
-        HStack(spacing: 2) {
-            yearButton(label: "Last year", year: nil)
+    private var yearDropdown: some View {
+        Picker("", selection: yearBinding) {
+            Text("Last 12 months").tag(nil as Int?)
+            Divider()
             ForEach(appState.availableYears, id: \.self) { year in
-                yearButton(label: "\(year)", year: year)
+                Text(String(year)).tag(year as Int?)
             }
         }
+        .pickerStyle(.menu)
+        .frame(width: 150)
     }
 
-    private func yearButton(label: String, year: Int?) -> some View {
-        let isSelected = appState.selectedYear == year
-
-        return Button(action: { appState.selectYear(year) }) {
-            Text(label)
-                .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
-                .foregroundStyle(isSelected ? .white : .secondary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(isSelected ? Color.accentColor : Color.clear)
-                )
-        }
-        .buttonStyle(.plain)
+    private var yearBinding: Binding<Int?> {
+        Binding(
+            get: { appState.selectedYear },
+            set: { appState.selectYear($0) }
+        )
     }
 
     // MARK: - Footer
@@ -207,7 +208,7 @@ struct MenuBarView: View {
             }
             .buttonStyle(.plain)
             .padding(.leading, 4)
-            .help("Quit GitHubContributions")
+            .help("Quit")
         }
     }
 
@@ -283,17 +284,13 @@ struct MenuBarView: View {
     private func dataErrorView(_ message: String) -> some View {
         VStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 24))
-                .foregroundStyle(.orange)
-
+                .font(.system(size: 24)).foregroundStyle(.orange)
             Text(message)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-
             Button("Retry") { appState.fetchContributions() }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
+                .buttonStyle(.borderedProminent).controlSize(.small)
         }
         .frame(height: 120)
     }
