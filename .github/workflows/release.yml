@@ -1,0 +1,47 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: GitHubContributions
+        run: xcodegen generate
+
+      - name: Build release
+        working-directory: GitHubContributions
+        run: |
+          xcodebuild -project GitHubContributions.xcodeproj \
+            -scheme GitHubContributions \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Package app
+        working-directory: GitHubContributions
+        run: |
+          APP_PATH="build/Build/Products/Release/GitHubContributions.app"
+          mkdir -p release
+          cp -R "$APP_PATH" release/
+          cd release
+          zip -r ../GitHubContributions.zip GitHubContributions.app
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: GitHubContributions/GitHubContributions.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
