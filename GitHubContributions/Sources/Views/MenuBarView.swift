@@ -37,6 +37,8 @@ struct MenuBarView: View {
 
     // MARK: - Login View
 
+    @State private var clientIdInput: String = ""
+
     private var loginView: some View {
         VStack(spacing: 12) {
             Image(systemName: "person.crop.circle")
@@ -58,7 +60,17 @@ struct MenuBarView: View {
                     .padding(.horizontal, 20)
             }
 
-            Button(action: { appState.login() }) {
+            // Only show Client ID field when not configured
+            if appState.needsClientId {
+                clientIdField
+            }
+
+            Button(action: {
+                if appState.needsClientId {
+                    appState.storedClientId = clientIdInput.trimmingCharacters(in: .whitespaces)
+                }
+                appState.login()
+            }) {
                 HStack(spacing: 6) {
                     Image(systemName: "arrow.right.circle.fill")
                     Text("Login with GitHub")
@@ -66,8 +78,34 @@ struct MenuBarView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.regular)
+            .disabled(appState.needsClientId && clientIdInput.trimmingCharacters(in: .whitespaces).isEmpty)
         }
         .padding(.vertical, 12)
+    }
+
+    /// Small inline field for entering the OAuth Client ID (shown only once).
+    private var clientIdField: some View {
+        VStack(spacing: 6) {
+            TextField("OAuth App Client ID", text: $clientIdInput)
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 12, design: .monospaced))
+                .frame(width: 280)
+
+            HStack(spacing: 4) {
+                Text("Need one?")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+
+                Button("Create a GitHub OAuth App") {
+                    if let url = URL(string: "https://github.com/settings/developers") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 9))
+                .foregroundStyle(.blue)
+            }
+        }
     }
 
     // MARK: - Authorizing View (Device Flow)

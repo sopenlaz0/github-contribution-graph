@@ -18,6 +18,10 @@ final class AppState: ObservableObject {
     /// GitHub username, fetched automatically after login.
     @AppStorage("githubUsername") var username: String = ""
 
+    /// Runtime Client ID. Used when the hardcoded default is the placeholder.
+    /// Stored once, persists across launches.
+    @AppStorage("oauthClientId") var storedClientId: String = ""
+
     // MARK: - Published State
 
     @Published var calendar: ContributionCalendar?
@@ -44,10 +48,22 @@ final class AppState: ObservableObject {
         !token.isEmpty && !username.isEmpty
     }
 
+    /// The effective Client ID: use the hardcoded one if it's real, otherwise the stored one.
+    var effectiveClientId: String {
+        if kGitHubClientIdDefault != "YOUR_CLIENT_ID_HERE" {
+            return kGitHubClientIdDefault
+        }
+        return storedClientId.trimmingCharacters(in: .whitespaces)
+    }
+
+    /// True when the user still needs to provide a Client ID.
+    var needsClientId: Bool {
+        effectiveClientId.isEmpty
+    }
+
     // MARK: - Login
 
     /// Starts the GitHub OAuth Device Flow.
-    /// Opens the browser, shows a code, and polls until authorized.
     func login() {
         authTask?.cancel()
         authTask = Task { await performLogin() }
@@ -84,33 +100,35 @@ final class AppState: ObservableObject {
     // MARK: - Private: Login
 
     private func performLogin() async {
+        let clientId = effectiveClientId
+        guard !clientId.isEmpty else {
+            errorMessage = "Enter your Client ID to continue."
+            return
+        }
+
         isAuthorizing = true
         errorMessage = nil
         deviceUserCode = nil
 
         do {
-            // 1. Request a device code
-            let deviceCode = try await auth.requestDeviceCode()
+            let deviceCode = try await auth.requestDeviceCode(clientId: clientId)
             guard !Task.isCancelled else { return }
 
-            // 2. Show the code and open the browser
             deviceUserCode = deviceCode.userCode
             if let url = URL(string: deviceCode.verificationUri) {
                 NSWorkspace.shared.open(url)
             }
 
-            // 3. Poll until the user authorizes
             let accessToken = try await auth.pollForToken(
+                clientId: clientId,
                 deviceCode: deviceCode.deviceCode,
                 interval: deviceCode.interval
             )
             guard !Task.isCancelled else { return }
 
-            // 4. Get the username
             let fetchedUsername = try await service.fetchUsername(token: accessToken)
             guard !Task.isCancelled else { return }
 
-            // 5. Done — store and load
             token = accessToken
             username = fetchedUsername
             isAuthorizing = false

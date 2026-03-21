@@ -7,13 +7,9 @@ import Foundation
 
 // MARK: - Configuration
 
-/// Your GitHub OAuth App's Client ID.
-/// Replace this with your own before building:
-///   1. Go to github.com/settings/developers
-///   2. Create a new OAuth App (any name/URL)
-///   3. Enable "Device Flow"
-///   4. Paste the Client ID here
-let kGitHubClientId = "YOUR_CLIENT_ID_HERE"
+/// Hardcoded Client ID — replace with your own to ship a pre-configured build.
+/// If left as the placeholder, the app will prompt for it at runtime (stored once).
+let kGitHubClientIdDefault = "YOUR_CLIENT_ID_HERE"
 
 // MARK: - GitHub Auth Service
 
@@ -28,7 +24,7 @@ final class GitHubAuth {
     // MARK: - Device Code Request
 
     /// Kicks off the Device Flow. Returns a code the user enters in their browser.
-    func requestDeviceCode() async throws -> DeviceCodeResponse {
+    func requestDeviceCode(clientId: String) async throws -> DeviceCodeResponse {
         let url = URL(string: "https://github.com/login/device/code")!
 
         var request = URLRequest(url: url)
@@ -36,7 +32,7 @@ final class GitHubAuth {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
 
-        let body = "client_id=\(kGitHubClientId)&scope=read:user"
+        let body = "client_id=\(clientId)&scope=read:user"
         request.httpBody = body.data(using: .utf8)
 
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -51,7 +47,7 @@ final class GitHubAuth {
     // MARK: - Poll for Token
 
     /// Polls GitHub until the user authorizes (or the code expires).
-    func pollForToken(deviceCode: String, interval: Int) async throws -> String {
+    func pollForToken(clientId: String, deviceCode: String, interval: Int) async throws -> String {
         let url = URL(string: "https://github.com/login/oauth/access_token")!
         var pollInterval = max(interval, 5)
 
@@ -64,7 +60,7 @@ final class GitHubAuth {
             request.setValue("application/json", forHTTPHeaderField: "Accept")
             request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
 
-            let body = "client_id=\(kGitHubClientId)&device_code=\(deviceCode)&grant_type=urn:ietf:params:oauth:grant-type:device_code"
+            let body = "client_id=\(clientId)&device_code=\(deviceCode)&grant_type=urn:ietf:params:oauth:grant-type:device_code"
             request.httpBody = body.data(using: .utf8)
 
             let (data, _) = try await URLSession.shared.data(for: request)
