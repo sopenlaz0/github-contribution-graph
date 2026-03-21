@@ -33,9 +33,13 @@ final class GitHubService {
 
     // MARK: - Fetch Contributions
 
-    /// Fetches the contribution calendar. Pass `year` for a specific year, or nil for the last 12 months.
-    func fetchContributions(username: String, token: String, year: Int? = nil) async throws -> ContributionCalendar {
-        let (query, variables) = buildQuery(username: username, year: year)
+    /// Fetches the contribution calendar for the selected range.
+    func fetchContributions(
+        username: String,
+        token: String,
+        range: ContributionRange = .last12Months
+    ) async throws -> ContributionCalendar {
+        let (query, variables) = buildQuery(username: username, range: range)
         let body: [String: Any] = ["query": query, "variables": variables]
 
         var request = URLRequest(url: graphQLEndpoint)
@@ -70,13 +74,13 @@ final class GitHubService {
     // MARK: - Private
 
     /// Uses GraphQL variables to avoid injection via username.
-    private func buildQuery(username: String, year: Int?) -> (String, [String: Any]) {
+    private func buildQuery(username: String, range: ContributionRange) -> (String, [String: Any]) {
         var variables: [String: Any] = ["login": username]
 
         let query: String
-        if let year = year {
-            variables["from"] = "\(year)-01-01T00:00:00Z"
-            variables["to"] = "\(year)-12-31T23:59:59Z"
+        if let boundedRange = dateRange(for: range) {
+            variables["from"] = boundedRange.from
+            variables["to"] = boundedRange.to
             query = """
             query($login: String!, $from: DateTime!, $to: DateTime!) {
               user(login: $login) {
@@ -105,6 +109,51 @@ final class GitHubService {
         }
 
         return (query, variables)
+    }
+
+    private func dateRange(for range: ContributionRange) -> (from: String, to: String)? {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = Date()
+
+        switch range {
+        case .last12Months:
+            return nil
+        case .thisMonth:
+            let components = calendar.dateComponents([.year, .month], from: now)
+            guard let startOfMonth = calendar.date(from: components) else { return nil }
+            return (isoString(from: startOfMonth), isoString(from: now))
+        case .year(let year):
+            var startComponents = DateComponents()
+            startComponents.year = year
+            startComponents.month = 1
+            startComponents.day = 1
+            startComponents.hour = 0
+            startComponents.minute = 0
+            startComponents.second = 0
+
+            var endComponents = DateComponents()
+            endComponents.year = year
+            endComponents.month = 12
+            endComponents.day = 31
+            endComponents.hour = 23
+            endComponents.minute = 59
+            endComponents.second = 59
+
+            guard
+                let start = calendar.date(from: startComponents),
+                let end = calendar.date(from: endComponents)
+            else {
+                return nil
+            }
+
+            return (isoString(from: start), isoString(from: end))
+        }
+    }
+
+    private func isoString(from date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.string(from: date)
     }
 }
 

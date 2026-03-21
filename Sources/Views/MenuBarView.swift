@@ -21,7 +21,7 @@ struct MenuBarView: View {
                 mainContent
             }
         }
-        .frame(width: 700)
+        .frame(width: popoverWidth)
         .padding(16)
         .onAppear {
             if !appState.isLoggedIn {
@@ -134,7 +134,7 @@ struct MenuBarView: View {
 
             Spacer()
 
-            yearPicker
+            rangePicker
 
             Button(action: { appState.refreshContributions() }) {
                 Group {
@@ -167,13 +167,14 @@ struct MenuBarView: View {
         .background(Capsule().fill(.green.opacity(0.12)))
     }
 
-    // MARK: - Year Dropdown
+    // MARK: - Time Range Picker
 
-    private var yearPicker: some View {
-        Picker("", selection: selectedYearBinding) {
-            Text("Last 12 months").tag(Optional<Int>.none)
+    private var rangePicker: some View {
+        Picker("", selection: selectedRangeBinding) {
+            Text("Last 12 months").tag(ContributionRange.last12Months)
+            Text("This month").tag(ContributionRange.thisMonth)
             ForEach(appState.availableYears, id: \.self) { year in
-                Text(String(year)).tag(Optional(year))
+                Text(String(year)).tag(ContributionRange.year(year))
             }
         }
         .labelsHidden()
@@ -266,17 +267,30 @@ struct MenuBarView: View {
     }
 
     private var loadingMessage: String {
-        if let year = appState.selectedYear {
+        switch appState.selectedRange {
+        case .last12Months:
+            return "Fetching contributions..."
+        case .thisMonth:
+            return "Loading this month..."
+        case .year(let year):
             return "Loading \(year) contributions..."
         }
-        return "Fetching contributions..."
     }
 
-    private var selectedYearBinding: Binding<Int?> {
+    private var selectedRangeBinding: Binding<ContributionRange> {
         Binding(
-            get: { appState.selectedYear },
-            set: { appState.selectYear($0) }
+            get: { appState.selectedRange },
+            set: { appState.selectRange($0) }
         )
+    }
+
+    private var popoverWidth: CGFloat {
+        switch appState.selectedRange {
+        case .thisMonth:
+            return 430
+        case .last12Months, .year:
+            return 700
+        }
     }
 
     // MARK: - Error Views

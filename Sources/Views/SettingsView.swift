@@ -88,10 +88,11 @@ struct SettingsView: View {
 
             Spacer()
 
-            Picker("", selection: selectedYearBinding) {
-                Text("Last 12 months").tag(Optional<Int>.none)
+            Picker("", selection: selectedRangeBinding) {
+                Text("Last 12 months").tag(ContributionRange.last12Months)
+                Text("This month").tag(ContributionRange.thisMonth)
                 ForEach(appState.availableYears, id: \.self) { year in
-                    Text(String(year)).tag(Optional(year))
+                    Text(String(year)).tag(ContributionRange.year(year))
                 }
             }
             .labelsHidden()
@@ -123,10 +124,10 @@ struct SettingsView: View {
         }
     }
 
-    private var selectedYearBinding: Binding<Int?> {
+    private var selectedRangeBinding: Binding<ContributionRange> {
         Binding(
-            get: { appState.selectedYear },
-            set: { appState.selectYear($0) }
+            get: { appState.selectedRange },
+            set: { appState.selectRange($0) }
         )
     }
 }

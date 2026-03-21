@@ -15,6 +15,14 @@ enum AuthStatus: Equatable {
     case error(String)
 }
 
+// MARK: - Contribution Range
+
+enum ContributionRange: Hashable {
+    case last12Months
+    case thisMonth
+    case year(Int)
+}
+
 // MARK: - App State
 
 @MainActor
@@ -29,8 +37,7 @@ final class AppState: ObservableObject {
     @Published var errorMessage: String?
     @Published var lastUpdated: Date?
 
-    /// nil = last 12 months (default), or a specific year like 2026
-    @Published var selectedYear: Int? = nil
+    @Published var selectedRange: ContributionRange = .last12Months
 
     // MARK: - Private
 
@@ -52,10 +59,25 @@ final class AppState: ObservableObject {
     }
 
     var contributionPeriodLabel: String {
-        if let year = selectedYear {
+        switch selectedRange {
+        case .last12Months:
+            return "in the last year"
+        case .thisMonth:
+            return "this month"
+        case .year(let year):
             return "in \(year)"
         }
-        return "in the last year"
+    }
+
+    var selectedRangeTitle: String {
+        switch selectedRange {
+        case .last12Months:
+            return "Last 12 months"
+        case .thisMonth:
+            return "This month"
+        case .year(let year):
+            return String(year)
+        }
     }
 
     /// Today's date as "yyyy-MM-dd" for matching against contribution days.
@@ -98,29 +120,27 @@ final class AppState: ObservableObject {
         calendar = nil
         lastUpdated = nil
         errorMessage = nil
-        selectedYear = nil
+        selectedRange = .last12Months
         isLoading = false
         authStatus = .needsLogin
     }
 
-    // MARK: - Year Selection
+    // MARK: - Range Selection
 
-    func selectYear(_ year: Int?) {
-        selectedYear = year
-        fetchContributions(resetCalendar: true)
+    func selectRange(_ range: ContributionRange) {
+        guard selectedRange != range else { return }
+        selectedRange = range
+        fetchContributions()
     }
 
     func refreshContributions() {
-        fetchContributions(resetCalendar: true)
+        fetchContributions()
     }
 
     // MARK: - Fetch Contributions
 
-    func fetchContributions(resetCalendar: Bool = false) {
-        if resetCalendar {
-            calendar = nil
-            errorMessage = nil
-        }
+    func fetchContributions() {
+        errorMessage = nil
         refreshTask?.cancel()
         refreshTask = Task { await performFetch() }
     }
@@ -170,7 +190,7 @@ final class AppState: ObservableObject {
 
         do {
             let result = try await service.fetchContributions(
-                username: username, token: token, year: selectedYear
+                username: username, token: token, range: selectedRange
             )
             guard !Task.isCancelled else { return }
 
