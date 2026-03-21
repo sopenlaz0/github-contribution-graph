@@ -40,6 +40,10 @@ struct SettingsView: View {
             Text("@\(appState.username)")
                 .font(.system(size: 13, weight: .medium))
 
+            Text("Authenticated via GitHub CLI")
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+
             Button("Logout") {
                 appState.logout()
                 dismiss()

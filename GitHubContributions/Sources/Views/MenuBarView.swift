@@ -1,6 +1,6 @@
 // Sources/Views/MenuBarView.swift
 // Main popover view shown when clicking the menu bar icon.
-// Handles login flow and displays the contribution graph.
+// Shows the contribution graph, or setup instructions if `gh` isn't ready.
 // RELEVANT FILES: Sources/Views/ContributionGraphView.swift, Sources/State/AppState.swift
 
 import SwiftUI
@@ -15,18 +15,25 @@ struct MenuBarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if appState.isAuthorizing {
-                authorizingView
-            } else if appState.isLoggedIn {
+            switch appState.authStatus {
+            case .checking:
+                checkingView
+            case .loggedIn:
                 loggedInContent
-            } else {
-                loginView
+            case .needsGH:
+                needsGHView
+            case .needsLogin:
+                needsLoginView
+            case .error(let message):
+                errorView(message)
             }
         }
         .frame(width: 620)
         .padding(16)
         .onAppear {
-            if appState.isLoggedIn && appState.calendar == nil {
+            if !appState.isLoggedIn {
+                appState.checkAuth()
+            } else if appState.calendar == nil {
                 appState.fetchContributions()
             }
         }
@@ -35,120 +42,64 @@ struct MenuBarView: View {
         }
     }
 
-    // MARK: - Login View
+    // MARK: - Checking View
 
-    @State private var clientIdInput: String = ""
+    private var checkingView: some View {
+        VStack(spacing: 8) {
+            ProgressView()
+                .scaleEffect(0.8)
+            Text("Checking GitHub CLI...")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
+        .frame(height: 120)
+    }
 
-    private var loginView: some View {
+    // MARK: - Needs GH Installed
+
+    private var needsGHView: some View {
         VStack(spacing: 12) {
-            Image(systemName: "person.crop.circle")
-                .font(.system(size: 32))
+            Image(systemName: "terminal")
+                .font(.system(size: 28))
                 .foregroundStyle(.secondary)
 
-            Text("GitHub Contributions")
+            Text("GitHub CLI not found")
                 .font(.system(size: 14, weight: .semibold))
 
-            Text("See your contribution graph at a glance.")
+            Text("Install it with Homebrew, then log in:")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
 
-            if let error = appState.errorMessage {
-                Text(error)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.red)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 20)
+            VStack(alignment: .leading, spacing: 6) {
+                commandRow("brew install gh")
+                commandRow("gh auth login")
             }
+            .padding(.vertical, 4)
 
-            // Only show Client ID field when not configured
-            if appState.needsClientId {
-                clientIdField
-            }
-
-            Button(action: {
-                if appState.needsClientId {
-                    appState.storedClientId = clientIdInput.trimmingCharacters(in: .whitespaces)
-                }
-                appState.login()
-            }) {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.right.circle.fill")
-                    Text("Login with GitHub")
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.regular)
-            .disabled(appState.needsClientId && clientIdInput.trimmingCharacters(in: .whitespaces).isEmpty)
+            retryButton
         }
         .padding(.vertical, 12)
     }
 
-    /// Small inline field for entering the OAuth Client ID (shown only once).
-    private var clientIdField: some View {
-        VStack(spacing: 6) {
-            TextField("OAuth App Client ID", text: $clientIdInput)
-                .textFieldStyle(.roundedBorder)
-                .font(.system(size: 12, design: .monospaced))
-                .frame(width: 280)
+    // MARK: - Needs Login
 
-            HStack(spacing: 4) {
-                Text("Need one?")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.tertiary)
-
-                Button("Create a GitHub OAuth App") {
-                    if let url = URL(string: "https://github.com/settings/developers") {
-                        NSWorkspace.shared.open(url)
-                    }
-                }
-                .buttonStyle(.plain)
-                .font(.system(size: 9))
-                .foregroundStyle(.blue)
-            }
-        }
-    }
-
-    // MARK: - Authorizing View (Device Flow)
-
-    private var authorizingView: some View {
-        VStack(spacing: 14) {
-            Text("First, copy your one-time code:")
-                .font(.system(size: 12))
+    private var needsLoginView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "person.crop.circle.badge.xmark")
+                .font(.system(size: 28))
                 .foregroundStyle(.secondary)
 
-            if let code = appState.deviceUserCode {
-                Text(code)
-                    .font(.system(size: 32, weight: .bold, design: .monospaced))
-                    .textSelection(.enabled)
+            Text("Not logged in to GitHub CLI")
+                .font(.system(size: 14, weight: .semibold))
 
-                Button("Copy Code") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(code, forType: .string)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-            }
-
-            Text("Then enter it on the GitHub page that just opened.")
+            Text("Run this in your terminal:")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
 
-            HStack(spacing: 6) {
-                ProgressView()
-                    .scaleEffect(0.6)
-                Text("Waiting for authorization...")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.top, 4)
+            commandRow("gh auth login")
+                .padding(.vertical, 4)
 
-            Button("Cancel") {
-                appState.cancelLogin()
-            }
-            .buttonStyle(.plain)
-            .font(.system(size: 10))
-            .foregroundStyle(.secondary)
+            retryButton
         }
         .padding(.vertical, 12)
     }
@@ -162,7 +113,7 @@ struct MenuBarView: View {
         } else if appState.isLoading {
             loadingView
         } else if let error = appState.errorMessage {
-            errorView(error)
+            dataErrorView(error)
         } else {
             loadingView
         }
@@ -234,6 +185,45 @@ struct MenuBarView: View {
         }
     }
 
+    // MARK: - Shared Components
+
+    /// A copyable terminal command row.
+    private func commandRow(_ command: String) -> some View {
+        HStack(spacing: 8) {
+            Text("$")
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(.tertiary)
+
+            Text(command)
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .textSelection(.enabled)
+
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(command, forType: .string)
+            } label: {
+                Image(systemName: "doc.on.doc")
+                    .font(.system(size: 9))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(RoundedRectangle(cornerRadius: 6).fill(.quaternary.opacity(0.5)))
+    }
+
+    private var retryButton: some View {
+        Button(action: { appState.checkAuth() }) {
+            HStack(spacing: 4) {
+                Image(systemName: "arrow.clockwise")
+                Text("Retry")
+            }
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.small)
+    }
+
     // MARK: - Loading
 
     private var loadingView: some View {
@@ -247,7 +237,7 @@ struct MenuBarView: View {
         .frame(height: 120)
     }
 
-    // MARK: - Error
+    // MARK: - Error Views
 
     private func errorView(_ message: String) -> some View {
         VStack(spacing: 8) {
@@ -260,11 +250,25 @@ struct MenuBarView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
-            Button("Retry") {
-                appState.fetchContributions()
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
+            retryButton
+        }
+        .padding(.vertical, 12)
+    }
+
+    private func dataErrorView(_ message: String) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 24))
+                .foregroundStyle(.orange)
+
+            Text(message)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            Button("Retry") { appState.fetchContributions() }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
         }
         .frame(height: 120)
     }

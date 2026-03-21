@@ -8,66 +8,49 @@ A minimal macOS menu bar app that shows your GitHub contribution graph. Click th
 
 ## Features
 
-- **Login with GitHub** — same device flow as `gh` CLI
+- **Zero config** — uses your existing `gh` CLI login. No tokens, no OAuth apps.
 - Lives in your menu bar — no dock icon
 - Shows the full GitHub contribution graph (52 weeks)
 - Matches GitHub's exact color scheme
 - Hover over any day to see the contribution count
-- Click to refresh, auto-fetches on open
 
 ## Requirements
 
 - macOS 14.0 (Sonoma) or later
 - Xcode 15+
+- [GitHub CLI](https://cli.github.com/) (`gh`) installed and logged in
 
-## Build & Run
+## Setup
 
-### 1. Set up the OAuth Client ID
+### 1. Make sure `gh` is installed and logged in
 
-Before building, you need a GitHub OAuth App Client ID. This is a one-time setup:
+```bash
+brew install gh
+gh auth login
+```
 
-1. Go to [github.com/settings/developers](https://github.com/settings/developers)
-2. Click **New OAuth App**
-3. Fill in any name and URL (e.g. `http://localhost`)
-4. **Check "Enable Device Flow"**
-5. Copy the **Client ID**
-6. Paste it into `Sources/Services/GitHubAuth.swift` — replace `YOUR_CLIENT_ID_HERE`
+If you've already done this before, you're good. The app just reads your existing token.
 
-### 2. Install XcodeGen & generate the project
+### 2. Build and run
 
 ```bash
 brew install xcodegen
 cd GitHubContributions
 xcodegen generate
-```
-
-### 3. Open and run
-
-```bash
 open GitHubContributions.xcodeproj
 ```
 
-Press `Cmd + R`. The app appears in your menu bar.
-
-### 4. Login
-
-1. Click the menu bar icon
-2. Click **Login with GitHub**
-3. Your browser opens to `github.com/login/device`
-4. Copy the code shown in the app, enter it in the browser
-5. Authorize — done, your contribution graph loads
+Press `Cmd + R`. The app appears in your menu bar and loads your graph.
 
 ## How It Works
 
-Uses the **GitHub OAuth Device Flow** — the same flow that `gh` CLI uses:
+The app runs `gh auth token` to grab the OAuth token from your existing GitHub CLI session. That's it — no OAuth apps, no Client IDs, no tokens to copy-paste.
 
-1. App requests a one-time code from GitHub
-2. Browser opens to the verification page
-3. You enter the code and authorize
-4. App polls until authorized, gets an access token
-5. Token is used to fetch contributions via the GraphQL API
+The token is used to:
+1. Fetch your username from the REST API (`/user`)
+2. Fetch your contribution calendar from the GraphQL API
 
-The Client ID is baked into the binary at build time. It's not a secret — it just identifies the OAuth App.
+If `gh` isn't installed or you're not logged in, the app shows the exact commands to run.
 
 ## Project Structure
 
@@ -78,12 +61,12 @@ GitHubContributions/
 │   │   └── GitHubContributionsApp.swift   # App entry point (MenuBarExtra)
 │   ├── Views/
 │   │   ├── ContributionGraphView.swift    # The green squares grid
-│   │   ├── MenuBarView.swift              # Popover: login flow + graph
+│   │   ├── MenuBarView.swift              # Popover: graph + setup instructions
 │   │   └── SettingsView.swift             # Account info + logout
 │   ├── Models/
 │   │   └── ContributionModels.swift       # GitHub API data models
 │   ├── Services/
-│   │   ├── GitHubAuth.swift               # OAuth Device Flow + Client ID
+│   │   ├── GitHubAuth.swift               # Reads token from `gh` CLI
 │   │   └── GitHubService.swift            # GitHub API (REST + GraphQL)
 │   └── State/
 │       └── AppState.swift                 # Observable app state

@@ -1,93 +1,64 @@
 // Sources/State/AppState.swift
 // Observable app state that drives the entire UI.
-// Manages OAuth login, contribution fetching, and all published state.
+// Uses `gh` CLI for auth, then fetches contributions via the GitHub API.
 // RELEVANT FILES: Sources/Services/GitHubAuth.swift, Sources/Services/GitHubService.swift
 
 import SwiftUI
+
+// MARK: - Auth Status
+
+enum AuthStatus: Equatable {
+    case checking
+    case loggedIn
+    case needsGH          // `gh` CLI not installed
+    case needsLogin       // `gh` installed but not authenticated
+    case error(String)
+}
 
 // MARK: - App State
 
 @MainActor
 final class AppState: ObservableObject {
 
-    // MARK: - Persisted
-
-    /// OAuth access token from the Device Flow.
-    @AppStorage("oauthToken") var token: String = ""
-
-    /// GitHub username, fetched automatically after login.
-    @AppStorage("githubUsername") var username: String = ""
-
-    /// Runtime Client ID. Used when the hardcoded default is the placeholder.
-    /// Stored once, persists across launches.
-    @AppStorage("oauthClientId") var storedClientId: String = ""
-
     // MARK: - Published State
 
+    @Published var authStatus: AuthStatus = .checking
+    @Published var username: String = ""
     @Published var calendar: ContributionCalendar?
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var lastUpdated: Date?
 
-    /// The one-time code shown to the user during login.
-    @Published var deviceUserCode: String?
-
-    /// True while waiting for the user to authorize in the browser.
-    @Published var isAuthorizing = false
-
     // MARK: - Private
 
     private let auth = GitHubAuth()
     private let service = GitHubService()
-    private var authTask: Task<Void, Never>?
+    private var token: String = ""
     private var refreshTask: Task<Void, Never>?
 
     // MARK: - Computed
 
     var isLoggedIn: Bool {
-        !token.isEmpty && !username.isEmpty
+        authStatus == .loggedIn && !token.isEmpty
     }
 
-    /// The effective Client ID: use the hardcoded one if it's real, otherwise the stored one.
-    var effectiveClientId: String {
-        if kGitHubClientIdDefault != "YOUR_CLIENT_ID_HERE" {
-            return kGitHubClientIdDefault
-        }
-        return storedClientId.trimmingCharacters(in: .whitespaces)
+    // MARK: - Auth
+
+    /// Attempts to grab the token from `gh auth token`.
+    /// If `gh` is installed and logged in, we're good to go.
+    func checkAuth() {
+        Task { await performAuthCheck() }
     }
 
-    /// True when the user still needs to provide a Client ID.
-    var needsClientId: Bool {
-        effectiveClientId.isEmpty
-    }
-
-    // MARK: - Login
-
-    /// Starts the GitHub OAuth Device Flow.
-    func login() {
-        authTask?.cancel()
-        authTask = Task { await performLogin() }
-    }
-
-    /// Cancels an in-progress login attempt.
-    func cancelLogin() {
-        authTask?.cancel()
-        isAuthorizing = false
-        deviceUserCode = nil
-        errorMessage = nil
-    }
-
-    /// Clears all stored credentials and data.
+    /// Clears local state (doesn't affect `gh` auth).
     func logout() {
-        authTask?.cancel()
         refreshTask?.cancel()
         token = ""
         username = ""
         calendar = nil
         lastUpdated = nil
-        deviceUserCode = nil
-        isAuthorizing = false
         errorMessage = nil
+        authStatus = .needsLogin
     }
 
     // MARK: - Fetch Contributions
@@ -97,51 +68,34 @@ final class AppState: ObservableObject {
         refreshTask = Task { await performFetch() }
     }
 
-    // MARK: - Private: Login
+    // MARK: - Private: Auth Check
 
-    private func performLogin() async {
-        let clientId = effectiveClientId
-        guard !clientId.isEmpty else {
-            errorMessage = "Enter your Client ID to continue."
+    private func performAuthCheck() async {
+        authStatus = .checking
+
+        guard auth.isInstalled() else {
+            authStatus = .needsGH
             return
         }
 
-        isAuthorizing = true
-        errorMessage = nil
-        deviceUserCode = nil
-
         do {
-            let deviceCode = try await auth.requestDeviceCode(clientId: clientId)
-            guard !Task.isCancelled else { return }
+            let fetchedToken = try await auth.getToken()
+            token = fetchedToken
 
-            deviceUserCode = deviceCode.userCode
-            if let url = URL(string: deviceCode.verificationUri) {
-                NSWorkspace.shared.open(url)
-            }
-
-            let accessToken = try await auth.pollForToken(
-                clientId: clientId,
-                deviceCode: deviceCode.deviceCode,
-                interval: deviceCode.interval
-            )
-            guard !Task.isCancelled else { return }
-
-            let fetchedUsername = try await service.fetchUsername(token: accessToken)
-            guard !Task.isCancelled else { return }
-
-            token = accessToken
+            let fetchedUsername = try await service.fetchUsername(token: fetchedToken)
             username = fetchedUsername
-            isAuthorizing = false
-            deviceUserCode = nil
-            fetchContributions()
+            authStatus = .loggedIn
 
-        } catch is CancellationError {
-            isAuthorizing = false
-            deviceUserCode = nil
+            fetchContributions()
+        } catch let error as AuthError {
+            switch error {
+            case .ghNotInstalled:
+                authStatus = .needsGH
+            case .notAuthenticated:
+                authStatus = .needsLogin
+            }
         } catch {
-            isAuthorizing = false
-            deviceUserCode = nil
-            errorMessage = error.localizedDescription
+            authStatus = .error(error.localizedDescription)
         }
     }
 
@@ -165,8 +119,9 @@ final class AppState: ObservableObject {
             guard !Task.isCancelled else { return }
 
             if let ghError = error as? GitHubError, case .httpError(401) = ghError {
-                errorMessage = "Session expired. Please log in again."
-                logout()
+                errorMessage = "Token expired. Click Refresh to re-authenticate."
+                token = ""
+                authStatus = .needsLogin
             } else {
                 errorMessage = error.localizedDescription
             }
