@@ -106,6 +106,23 @@ enum ContributionRange: Hashable, Codable {
     }
 }
 
+enum MenuBarDisplayMode: String, CaseIterable, Codable {
+    case iconOnly
+    case todayCount
+    case currentStreak
+
+    var title: String {
+        switch self {
+        case .iconOnly:
+            return "Icon only"
+        case .todayCount:
+            return "Today's count"
+        case .currentStreak:
+            return "Current streak"
+        }
+    }
+}
+
 // MARK: - App State
 
 @MainActor
@@ -121,6 +138,7 @@ final class AppState: ObservableObject {
     private enum PersistenceKeys {
         static let selectedRange = "selectedContributionRange"
         static let cachedState = "cachedContributionState"
+        static let menuBarDisplayMode = "menuBarDisplayMode"
     }
 
     // MARK: - Published State
@@ -133,6 +151,7 @@ final class AppState: ObservableObject {
     @Published var lastUpdated: Date?
 
     @Published var selectedRange: ContributionRange = .last12Months
+    @Published var menuBarDisplayMode: MenuBarDisplayMode = .todayCount
 
     // MARK: - Private
 
@@ -182,6 +201,17 @@ final class AppState: ObservableObject {
         return calendar.summary(dayCount: selectedRange.dayCount ?? visibleDays.count)
     }
 
+    var menuBarValueText: String? {
+        switch menuBarDisplayMode {
+        case .iconOnly:
+            return nil
+        case .todayCount:
+            return todayContributions.map(String.init)
+        case .currentStreak:
+            return contributionSummary.map { "\($0.currentStreak)" }
+        }
+    }
+
     /// Today's date as "yyyy-MM-dd" for matching against contribution days.
     private static let todayFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -209,6 +239,7 @@ final class AppState: ObservableObject {
 
     init() {
         restorePersistedSelection()
+        restoreMenuBarDisplayMode()
     }
 
     // MARK: - Auth
@@ -243,6 +274,12 @@ final class AppState: ObservableObject {
 
     func refreshContributions() {
         fetchContributions()
+    }
+
+    func selectMenuBarDisplayMode(_ mode: MenuBarDisplayMode) {
+        guard menuBarDisplayMode != mode else { return }
+        menuBarDisplayMode = mode
+        persistMenuBarDisplayMode()
     }
 
     // MARK: - Fetch Contributions
@@ -349,6 +386,17 @@ final class AppState: ObservableObject {
         lastUpdated = cached.lastUpdated
     }
 
+    private func restoreMenuBarDisplayMode() {
+        guard
+            let rawValue = UserDefaults.standard.string(forKey: PersistenceKeys.menuBarDisplayMode),
+            let mode = MenuBarDisplayMode(rawValue: rawValue)
+        else {
+            return
+        }
+
+        menuBarDisplayMode = mode
+    }
+
     private func persistCachedState() {
         guard let calendar, let lastUpdated else { return }
 
@@ -367,5 +415,9 @@ final class AppState: ObservableObject {
     private func clearPersistedState() {
         UserDefaults.standard.removeObject(forKey: PersistenceKeys.cachedState)
         UserDefaults.standard.removeObject(forKey: PersistenceKeys.selectedRange)
+    }
+
+    private func persistMenuBarDisplayMode() {
+        UserDefaults.standard.set(menuBarDisplayMode.rawValue, forKey: PersistenceKeys.menuBarDisplayMode)
     }
 }

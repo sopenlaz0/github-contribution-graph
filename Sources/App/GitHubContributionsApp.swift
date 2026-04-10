@@ -23,8 +23,8 @@ struct GitHubContributionsApp: App {
         } label: {
             HStack(spacing: 3) {
                 Image(systemName: "square.grid.3x3.fill")
-                if let count = appState.todayContributions {
-                    Text("\(count)")
+                if let value = appState.menuBarValueText {
+                    Text(value)
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
                 }
             }

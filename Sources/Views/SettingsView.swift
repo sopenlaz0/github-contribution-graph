@@ -17,6 +17,7 @@ struct SettingsView: View {
             header
             accountCard
             yearSection
+            menuBarSection
             Divider()
             actions
         }
@@ -103,6 +104,26 @@ struct SettingsView: View {
         }
     }
 
+    private var menuBarSection: some View {
+        HStack {
+            Text("Menu bar label")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            Picker("", selection: menuBarDisplayModeBinding) {
+                ForEach(MenuBarDisplayMode.allCases, id: \.self) { mode in
+                    Text(mode.title).tag(mode)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .controlSize(.small)
+            .fixedSize()
+        }
+    }
+
     // MARK: - Actions
 
     private var actions: some View {
@@ -128,6 +149,13 @@ struct SettingsView: View {
         Binding(
             get: { appState.selectedRange },
             set: { appState.selectRange($0) }
+        )
+    }
+
+    private var menuBarDisplayModeBinding: Binding<MenuBarDisplayMode> {
+        Binding(
+            get: { appState.menuBarDisplayMode },
+            set: { appState.selectMenuBarDisplayMode($0) }
         )
     }
 }

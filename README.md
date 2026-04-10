@@ -31,6 +31,7 @@ gh auth login
 ## Features
 
 - **Today's count in the menu bar** — see your number without clicking
+- **Custom menu bar label** — show icon only, today's count, or your current streak
 - **Full contribution graph** — 52 weeks, GitHub's exact colors
 - **Compact month view** — switch to this month for a narrower popover
 - **Dark mode** — proper GitHub dark palette, auto-switches
