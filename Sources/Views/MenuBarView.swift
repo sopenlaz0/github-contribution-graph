@@ -9,7 +9,7 @@ import SwiftUI
 
 struct MenuBarView: View {
     private let contentInset: CGFloat = 8
-    private let graphLeadingCompensation: CGFloat = 10
+    private let graphLeadingCompensation: CGFloat = 18
 
     @ObservedObject var appState: AppState
 
