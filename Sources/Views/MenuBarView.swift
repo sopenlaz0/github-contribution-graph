@@ -9,6 +9,7 @@ import SwiftUI
 
 struct MenuBarView: View {
     private let contentInset: CGFloat = 8
+    private let graphLeadingCompensation: CGFloat = 10
 
     @ObservedObject var appState: AppState
 
@@ -174,6 +175,7 @@ struct MenuBarView: View {
                     todayId: appState.todayDateString,
                     onOpenDay: openGitHubDay
                 )
+                .padding(.leading, graphLeadingCompensation)
                 Spacer(minLength: 0)
             }
             footer
