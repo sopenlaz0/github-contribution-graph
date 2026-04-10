@@ -4,3 +4,4 @@ build-generated/
 GitHubContributions.xcodeproj/
 GitHubContributions/*.xcodeproj/
 GitHubContributions/**/*.xcuserdatad/
+.omx/
