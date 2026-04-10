@@ -18,6 +18,7 @@ struct SettingsView: View {
             accountCard
             yearSection
             menuBarSection
+            refreshSection
             Divider()
             actions
         }
@@ -125,6 +126,21 @@ struct SettingsView: View {
         }
     }
 
+    private var refreshSection: some View {
+        Toggle(isOn: automaticRefreshBinding) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Automatic refresh")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Text("Refresh in the background every 15 minutes")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .toggleStyle(.switch)
+        .controlSize(.small)
+    }
+
     // MARK: - Actions
 
     private var actions: some View {
@@ -159,6 +175,13 @@ struct SettingsView: View {
         Binding(
             get: { appState.menuBarDisplayMode },
             set: { appState.selectMenuBarDisplayMode($0) }
+        )
+    }
+
+    private var automaticRefreshBinding: Binding<Bool> {
+        Binding(
+            get: { appState.automaticRefreshEnabled },
+            set: { appState.setAutomaticRefreshEnabled($0) }
         )
     }
 }

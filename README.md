@@ -34,6 +34,7 @@ gh auth login
 - **Custom menu bar label** — show icon only, today's count, or your current streak
 - **Full contribution graph** — 52 weeks, GitHub's exact colors
 - **Compact month view** — switch to this month for a narrower popover
+- **Automatic background refresh** — keep the menu bar fresh every 15 minutes
 - **Dark mode** — proper GitHub dark palette, auto-switches
 - **Time range selector** — last 12 months, this month, or a specific year
 - **Insight chips** — current streak, best day, average/day, and longest streak

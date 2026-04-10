@@ -129,6 +129,7 @@ enum MenuBarDisplayMode: String, CaseIterable, Codable {
 final class AppState: ObservableObject {
 
     private static let staleRefreshInterval: TimeInterval = 60 * 15
+    private static let automaticRefreshInterval: TimeInterval = 60 * 15
 
     private struct CachedContributionState: Codable {
         let username: String
@@ -141,6 +142,7 @@ final class AppState: ObservableObject {
         static let selectedRange = "selectedContributionRange"
         static let cachedState = "cachedContributionState"
         static let menuBarDisplayMode = "menuBarDisplayMode"
+        static let automaticRefreshEnabled = "automaticRefreshEnabled"
     }
 
     // MARK: - Published State
@@ -154,6 +156,7 @@ final class AppState: ObservableObject {
 
     @Published var selectedRange: ContributionRange = .last12Months
     @Published var menuBarDisplayMode: MenuBarDisplayMode = .todayCount
+    @Published var automaticRefreshEnabled = true
 
     // MARK: - Private
 
@@ -162,6 +165,7 @@ final class AppState: ObservableObject {
     private var token: String = ""
     private var authTask: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
+    private var backgroundRefreshTask: Task<Void, Never>?
 
     // MARK: - Computed
 
@@ -252,6 +256,8 @@ final class AppState: ObservableObject {
     init() {
         restorePersistedSelection()
         restoreMenuBarDisplayMode()
+        restoreAutomaticRefreshPreference()
+        configureAutomaticRefreshLoop()
     }
 
     // MARK: - Auth
@@ -297,6 +303,13 @@ final class AppState: ObservableObject {
         guard menuBarDisplayMode != mode else { return }
         menuBarDisplayMode = mode
         persistMenuBarDisplayMode()
+    }
+
+    func setAutomaticRefreshEnabled(_ isEnabled: Bool) {
+        guard automaticRefreshEnabled != isEnabled else { return }
+        automaticRefreshEnabled = isEnabled
+        persistAutomaticRefreshPreference()
+        configureAutomaticRefreshLoop()
     }
 
     // MARK: - Fetch Contributions
@@ -414,6 +427,14 @@ final class AppState: ObservableObject {
         menuBarDisplayMode = mode
     }
 
+    private func restoreAutomaticRefreshPreference() {
+        guard UserDefaults.standard.object(forKey: PersistenceKeys.automaticRefreshEnabled) != nil else {
+            return
+        }
+
+        automaticRefreshEnabled = UserDefaults.standard.bool(forKey: PersistenceKeys.automaticRefreshEnabled)
+    }
+
     private func persistCachedState() {
         guard let calendar, let lastUpdated else { return }
 
@@ -436,5 +457,29 @@ final class AppState: ObservableObject {
 
     private func persistMenuBarDisplayMode() {
         UserDefaults.standard.set(menuBarDisplayMode.rawValue, forKey: PersistenceKeys.menuBarDisplayMode)
+    }
+
+    private func persistAutomaticRefreshPreference() {
+        UserDefaults.standard.set(automaticRefreshEnabled, forKey: PersistenceKeys.automaticRefreshEnabled)
+    }
+
+    private func configureAutomaticRefreshLoop() {
+        backgroundRefreshTask?.cancel()
+
+        guard automaticRefreshEnabled else { return }
+
+        backgroundRefreshTask = Task { [weak self] in
+            while !Task.isCancelled {
+                let delay = UInt64(Self.automaticRefreshInterval * 1_000_000_000)
+                try? await Task.sleep(nanoseconds: delay)
+                guard !Task.isCancelled else { break }
+                await self?.performAutomaticRefreshIfNeeded()
+            }
+        }
+    }
+
+    private func performAutomaticRefreshIfNeeded() async {
+        guard automaticRefreshEnabled, isLoggedIn, !isLoading else { return }
+        await performFetch()
     }
 }
