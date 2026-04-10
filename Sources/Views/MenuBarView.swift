@@ -115,6 +115,9 @@ struct MenuBarView: View {
     private func contributionView(_ calendar: ContributionCalendar) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             header(totalContributions: calendar.totalContributions)
+            if let summary = appState.contributionSummary {
+                summaryRow(summary)
+            }
             HStack(spacing: 0) {
                 Spacer(minLength: 0)
                 ContributionGraphView(calendar: calendar, todayId: appState.todayDateString)
@@ -170,6 +173,42 @@ struct MenuBarView: View {
         .padding(.horizontal, 7)
         .padding(.vertical, 2)
         .background(Capsule().fill(.green.opacity(0.12)))
+    }
+
+    private func summaryRow(_ summary: ContributionSummary) -> some View {
+        HStack(spacing: 6) {
+            metricChip(title: "Streak", value: "\(summary.currentStreak)d")
+            metricChip(title: "Best", value: bestDayLabel(summary.bestDay))
+            metricChip(title: "Avg/day", value: summary.averagePerDay.formatted(.number.precision(.fractionLength(1))))
+
+            if summary.longestStreak > summary.currentStreak {
+                metricChip(title: "Longest", value: "\(summary.longestStreak)d")
+            }
+
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func metricChip(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(title)
+                .font(.system(size: 9))
+                .foregroundStyle(.tertiary)
+            Text(value)
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundStyle(.primary)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(RoundedRectangle(cornerRadius: 8).fill(.quaternary.opacity(0.45)))
+    }
+
+    private func bestDayLabel(_ day: ContributionDay?) -> String {
+        guard let day else { return "None" }
+
+        let date = day.parsedDate ?? Date()
+        let formatter = Date.FormatStyle().month(.abbreviated).day()
+        return "\(day.contributionCount) on \(date.formatted(formatter))"
     }
 
     // MARK: - Time Range Picker

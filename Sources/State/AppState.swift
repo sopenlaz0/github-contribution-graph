@@ -17,16 +17,111 @@ enum AuthStatus: Equatable {
 
 // MARK: - Contribution Range
 
-enum ContributionRange: Hashable {
+enum ContributionRange: Hashable, Codable {
     case last12Months
     case thisMonth
     case year(Int)
+
+    private enum CodingKeys: String, CodingKey {
+        case kind
+        case year
+    }
+
+    private enum Kind: String, Codable {
+        case last12Months
+        case thisMonth
+        case year
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let kind = try container.decode(Kind.self, forKey: .kind)
+
+        switch kind {
+        case .last12Months:
+            self = .last12Months
+        case .thisMonth:
+            self = .thisMonth
+        case .year:
+            self = .year(try container.decode(Int.self, forKey: .year))
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        switch self {
+        case .last12Months:
+            try container.encode(Kind.last12Months, forKey: .kind)
+        case .thisMonth:
+            try container.encode(Kind.thisMonth, forKey: .kind)
+        case .year(let year):
+            try container.encode(Kind.year, forKey: .kind)
+            try container.encode(year, forKey: .year)
+        }
+    }
+
+    func dateBounds(referenceDate: Date = Date()) -> ClosedRange<Date>? {
+        let calendar = Calendar(identifier: .gregorian)
+
+        switch self {
+        case .last12Months:
+            return nil
+        case .thisMonth:
+            let components = calendar.dateComponents([.year, .month], from: referenceDate)
+            guard let start = calendar.date(from: components) else { return nil }
+            return start...referenceDate
+        case .year(let year):
+            var startComponents = DateComponents()
+            startComponents.year = year
+            startComponents.month = 1
+            startComponents.day = 1
+            startComponents.hour = 0
+            startComponents.minute = 0
+            startComponents.second = 0
+
+            var endComponents = DateComponents()
+            endComponents.year = year
+            endComponents.month = 12
+            endComponents.day = 31
+            endComponents.hour = 23
+            endComponents.minute = 59
+            endComponents.second = 59
+
+            guard
+                let start = calendar.date(from: startComponents),
+                let end = calendar.date(from: endComponents)
+            else {
+                return nil
+            }
+
+            return start...end
+        }
+    }
+
+    var dayCount: Int? {
+        guard let bounds = dateBounds() else { return nil }
+        let calendar = Calendar(identifier: .gregorian)
+        return calendar.dateComponents([.day], from: bounds.lowerBound, to: bounds.upperBound).day.map { $0 + 1 }
+    }
 }
 
 // MARK: - App State
 
 @MainActor
 final class AppState: ObservableObject {
+
+    private struct CachedContributionState: Codable {
+        let username: String
+        let selectedRange: ContributionRange
+        let calendar: ContributionCalendar
+        let lastUpdated: Date
+    }
+
+    private enum PersistenceKeys {
+        static let selectedRange = "selectedContributionRange"
+        static let cachedState = "cachedContributionState"
+    }
 
     // MARK: - Published State
 
@@ -80,6 +175,13 @@ final class AppState: ObservableObject {
         }
     }
 
+    var contributionSummary: ContributionSummary? {
+        guard let calendar else { return nil }
+        let visibleDays = calendar.allDays.filter { $0.isVisible }
+        guard !visibleDays.isEmpty else { return nil }
+        return calendar.summary(dayCount: selectedRange.dayCount ?? visibleDays.count)
+    }
+
     /// Today's date as "yyyy-MM-dd" for matching against contribution days.
     private static let todayFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -98,11 +200,15 @@ final class AppState: ObservableObject {
         guard let cal = calendar else { return nil }
         let today = todayDateString
         for week in cal.weeks {
-            if let day = week.contributionDays.first(where: { $0.date == today }) {
+            if let day = week.contributionDays.first(where: { $0.date == today && $0.isVisible }) {
                 return day.contributionCount
             }
         }
         return nil
+    }
+
+    init() {
+        restorePersistedSelection()
     }
 
     // MARK: - Auth
@@ -123,6 +229,7 @@ final class AppState: ObservableObject {
         selectedRange = .last12Months
         isLoading = false
         authStatus = .needsLogin
+        clearPersistedState()
     }
 
     // MARK: - Range Selection
@@ -130,6 +237,7 @@ final class AppState: ObservableObject {
     func selectRange(_ range: ContributionRange) {
         guard selectedRange != range else { return }
         selectedRange = range
+        persistSelectedRange()
         fetchContributions()
     }
 
@@ -165,6 +273,7 @@ final class AppState: ObservableObject {
             username = fetchedUsername
             authStatus = .loggedIn
 
+            restoreCachedStateIfAvailable(for: fetchedUsername)
             fetchContributions()
         } catch let error as AuthError {
             guard !Task.isCancelled else { return }
@@ -196,6 +305,7 @@ final class AppState: ObservableObject {
 
             calendar = result
             lastUpdated = Date()
+            persistCachedState()
         } catch {
             guard !Task.isCancelled else { return }
 
@@ -207,5 +317,55 @@ final class AppState: ObservableObject {
                 errorMessage = error.localizedDescription
             }
         }
+    }
+
+    private func restorePersistedSelection() {
+        guard
+            let data = UserDefaults.standard.data(forKey: PersistenceKeys.selectedRange),
+            let range = try? JSONDecoder().decode(ContributionRange.self, from: data)
+        else {
+            return
+        }
+
+        selectedRange = range
+    }
+
+    private func persistSelectedRange() {
+        guard let data = try? JSONEncoder().encode(selectedRange) else { return }
+        UserDefaults.standard.set(data, forKey: PersistenceKeys.selectedRange)
+    }
+
+    private func restoreCachedStateIfAvailable(for username: String) {
+        guard
+            let data = UserDefaults.standard.data(forKey: PersistenceKeys.cachedState),
+            let cached = try? JSONDecoder().decode(CachedContributionState.self, from: data),
+            cached.username == username,
+            cached.selectedRange == selectedRange
+        else {
+            return
+        }
+
+        calendar = cached.calendar
+        lastUpdated = cached.lastUpdated
+    }
+
+    private func persistCachedState() {
+        guard let calendar, let lastUpdated else { return }
+
+        let cached = CachedContributionState(
+            username: username,
+            selectedRange: selectedRange,
+            calendar: calendar,
+            lastUpdated: lastUpdated
+        )
+
+        guard let data = try? JSONEncoder().encode(cached) else { return }
+        UserDefaults.standard.set(data, forKey: PersistenceKeys.cachedState)
+        persistSelectedRange()
+    }
+
+    private func clearPersistedState() {
+        UserDefaults.standard.removeObject(forKey: PersistenceKeys.cachedState)
+        UserDefaults.standard.removeObject(forKey: PersistenceKeys.selectedRange)
     }
 }

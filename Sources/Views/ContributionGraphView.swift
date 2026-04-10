@@ -46,7 +46,9 @@ struct ContributionGraphView: View {
         dict.reserveCapacity(calendar.weeks.count * 7)
         for week in calendar.weeks {
             for day in week.contributionDays {
-                dict[day.id] = day
+                if day.isVisible {
+                    dict[day.id] = day
+                }
             }
         }
         return dict
@@ -182,7 +184,7 @@ struct ContributionGraphView: View {
 
         for (index, week) in calendar.weeks.enumerated() {
             guard let firstDay = week.contributionDays.first,
-                  let date = formatter.date(from: firstDay.date) else {
+                  let date = week.contributionDays.first(where: { $0.isVisible })?.parsedDate ?? formatter.date(from: firstDay.date) else {
                 currentSpan += 1
                 continue
             }
@@ -223,7 +225,7 @@ struct ContributionCellView: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: 2)
-            .fill(fillColor)
+            .fill(day.isVisible ? fillColor : .clear)
             .frame(width: cellSize, height: cellSize)
             .overlay(
                 RoundedRectangle(cornerRadius: 2)
@@ -231,12 +233,13 @@ struct ContributionCellView: View {
                     .opacity(showBorder ? 1 : 0)
             )
             .onHover { hovered in
+                guard day.isVisible else { return }
                 onHover(hovered)
             }
-            .help(ContributionGraphView.tooltipText(for: day))
+            .help(day.isVisible ? ContributionGraphView.tooltipText(for: day) : "")
     }
 
-    private var showBorder: Bool { isHovered || isToday }
+    private var showBorder: Bool { day.isVisible && (isHovered || isToday) }
     private var borderColor: Color { isToday ? .white : .primary.opacity(0.5) }
     private var borderWidth: CGFloat { isToday ? 1.5 : 1 }
 }

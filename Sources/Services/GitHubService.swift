@@ -68,6 +68,10 @@ final class GitHubService {
             throw GitHubError.userNotFound(username)
         }
 
+        if let bounds = range.dateBounds() {
+            return calendar.clipped(to: bounds)
+        }
+
         return calendar
     }
 
