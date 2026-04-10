@@ -19,6 +19,7 @@ struct SettingsView: View {
             yearSection
             menuBarSection
             refreshSection
+            reminderSection
             Divider()
             actions
         }
@@ -141,6 +142,21 @@ struct SettingsView: View {
         .controlSize(.small)
     }
 
+    private var reminderSection: some View {
+        Toggle(isOn: dailyReminderBinding) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Daily reminder")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Text("Send a notification at 6:00 PM if today is still empty")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .toggleStyle(.switch)
+        .controlSize(.small)
+    }
+
     // MARK: - Actions
 
     private var actions: some View {
@@ -182,6 +198,13 @@ struct SettingsView: View {
         Binding(
             get: { appState.automaticRefreshEnabled },
             set: { appState.setAutomaticRefreshEnabled($0) }
+        )
+    }
+
+    private var dailyReminderBinding: Binding<Bool> {
+        Binding(
+            get: { appState.dailyReminderEnabled },
+            set: { appState.setDailyReminderEnabled($0) }
         )
     }
 }

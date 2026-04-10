@@ -4,6 +4,7 @@
 // RELEVANT FILES: Sources/Services/GitHubAuth.swift, Sources/Services/GitHubService.swift
 
 import SwiftUI
+import UserNotifications
 
 // MARK: - Auth Status
 
@@ -130,6 +131,9 @@ final class AppState: ObservableObject {
 
     private static let staleRefreshInterval: TimeInterval = 60 * 15
     private static let automaticRefreshInterval: TimeInterval = 60 * 15
+    private static let dailyReminderHour = 18
+    private static let dailyReminderMinute = 0
+    private static let dailyReminderIdentifier = "dailyContributionReminder"
 
     private struct CachedContributionState: Codable {
         let username: String
@@ -143,6 +147,7 @@ final class AppState: ObservableObject {
         static let cachedState = "cachedContributionState"
         static let menuBarDisplayMode = "menuBarDisplayMode"
         static let automaticRefreshEnabled = "automaticRefreshEnabled"
+        static let dailyReminderEnabled = "dailyReminderEnabled"
     }
 
     // MARK: - Published State
@@ -157,6 +162,7 @@ final class AppState: ObservableObject {
     @Published var selectedRange: ContributionRange = .last12Months
     @Published var menuBarDisplayMode: MenuBarDisplayMode = .todayCount
     @Published var automaticRefreshEnabled = true
+    @Published var dailyReminderEnabled = false
 
     // MARK: - Private
 
@@ -257,6 +263,7 @@ final class AppState: ObservableObject {
         restorePersistedSelection()
         restoreMenuBarDisplayMode()
         restoreAutomaticRefreshPreference()
+        restoreDailyReminderPreference()
         configureAutomaticRefreshLoop()
     }
 
@@ -279,6 +286,7 @@ final class AppState: ObservableObject {
         isLoading = false
         authStatus = .needsLogin
         clearPersistedState()
+        Task { await removeDailyReminderNotification() }
     }
 
     // MARK: - Range Selection
@@ -312,6 +320,16 @@ final class AppState: ObservableObject {
         configureAutomaticRefreshLoop()
     }
 
+    func setDailyReminderEnabled(_ isEnabled: Bool) {
+        guard dailyReminderEnabled != isEnabled else { return }
+        dailyReminderEnabled = isEnabled
+        persistDailyReminderPreference()
+
+        Task {
+            await updateDailyReminderSchedule(requestAuthorizationIfNeeded: isEnabled)
+        }
+    }
+
     // MARK: - Fetch Contributions
 
     func fetchContributions() {
@@ -341,6 +359,7 @@ final class AppState: ObservableObject {
             authStatus = .loggedIn
 
             restoreCachedStateIfAvailable(for: fetchedUsername)
+            await updateDailyReminderSchedule(requestAuthorizationIfNeeded: false)
             fetchContributions()
         } catch let error as AuthError {
             guard !Task.isCancelled else { return }
@@ -373,6 +392,9 @@ final class AppState: ObservableObject {
             calendar = result
             lastUpdated = Date()
             persistCachedState()
+            Task { [weak self] in
+                await self?.updateDailyReminderSchedule(requestAuthorizationIfNeeded: false)
+            }
         } catch {
             guard !Task.isCancelled else { return }
 
@@ -435,6 +457,14 @@ final class AppState: ObservableObject {
         automaticRefreshEnabled = UserDefaults.standard.bool(forKey: PersistenceKeys.automaticRefreshEnabled)
     }
 
+    private func restoreDailyReminderPreference() {
+        guard UserDefaults.standard.object(forKey: PersistenceKeys.dailyReminderEnabled) != nil else {
+            return
+        }
+
+        dailyReminderEnabled = UserDefaults.standard.bool(forKey: PersistenceKeys.dailyReminderEnabled)
+    }
+
     private func persistCachedState() {
         guard let calendar, let lastUpdated else { return }
 
@@ -463,6 +493,10 @@ final class AppState: ObservableObject {
         UserDefaults.standard.set(automaticRefreshEnabled, forKey: PersistenceKeys.automaticRefreshEnabled)
     }
 
+    private func persistDailyReminderPreference() {
+        UserDefaults.standard.set(dailyReminderEnabled, forKey: PersistenceKeys.dailyReminderEnabled)
+    }
+
     private func configureAutomaticRefreshLoop() {
         backgroundRefreshTask?.cancel()
 
@@ -481,5 +515,64 @@ final class AppState: ObservableObject {
     private func performAutomaticRefreshIfNeeded() async {
         guard automaticRefreshEnabled, isLoggedIn, !isLoading else { return }
         await performFetch()
+    }
+
+    private func updateDailyReminderSchedule(requestAuthorizationIfNeeded: Bool) async {
+        guard dailyReminderEnabled, isLoggedIn else {
+            await removeDailyReminderNotification()
+            return
+        }
+
+        let center = UNUserNotificationCenter.current()
+        let settings = await center.notificationSettings()
+
+        if settings.authorizationStatus == .notDetermined, requestAuthorizationIfNeeded {
+            let granted = (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
+            guard granted else {
+                dailyReminderEnabled = false
+                persistDailyReminderPreference()
+                await removeDailyReminderNotification()
+                return
+            }
+        } else if settings.authorizationStatus != .authorized, settings.authorizationStatus != .provisional {
+            await removeDailyReminderNotification()
+            return
+        }
+
+        let todayCount = await resolveTodayContributionCount()
+        guard let todayCount, todayCount == 0 else {
+            await removeDailyReminderNotification()
+            return
+        }
+
+        let content = UNMutableNotificationContent()
+        content.title = "No contributions yet today"
+        content.body = "Open GitHub Contributions and keep your streak moving."
+        content.sound = .default
+
+        var components = DateComponents()
+        components.hour = Self.dailyReminderHour
+        components.minute = Self.dailyReminderMinute
+
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+        let request = UNNotificationRequest(
+            identifier: Self.dailyReminderIdentifier,
+            content: content,
+            trigger: trigger
+        )
+
+        try? await center.add(request)
+    }
+
+    private func resolveTodayContributionCount() async -> Int? {
+        if let todayContributions {
+            return todayContributions
+        }
+
+        return try? await service.fetchTodayContributionCount(username: username, token: token)
+    }
+
+    private func removeDailyReminderNotification() async {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [Self.dailyReminderIdentifier])
     }
 }

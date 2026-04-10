@@ -35,9 +35,10 @@ gh auth login
 - **Full contribution graph** — 52 weeks, GitHub's exact colors
 - **Compact month view** — switch to this month for a narrower popover
 - **Automatic background refresh** — keep the menu bar fresh every 15 minutes
+- **Daily reminder notification** — optional 6:00 PM reminder if you still have no contributions today
 - **Dark mode** — proper GitHub dark palette, auto-switches
 - **Time range selector** — last 12 months, this month, or a specific year
-- **Insight chips** — current streak, best day, average/day, and longest streak
+- **Insight chips** — current streak, trailing 7-day total, week-over-week delta, best day, average/day, and longest streak
 - **Hover details + quick open** — hover any square for count + date, then click to open that day on GitHub
 - **Today highlighted** — today's cell has a distinct border + green badge
 - **Zero config** — uses `gh auth token`, no tokens to paste

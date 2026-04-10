@@ -75,6 +75,63 @@ final class GitHubService {
         return calendar
     }
 
+    func fetchTodayContributionCount(username: String, token: String) async throws -> Int {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = Date()
+        let startOfDay = calendar.startOfDay(for: now)
+        guard let endOfDay = calendar.date(byAdding: DateComponents(day: 1, second: -1), to: startOfDay) else {
+            return 0
+        }
+
+        let query = """
+        query($login: String!, $from: DateTime!, $to: DateTime!) {
+          user(login: $login) {
+            contributionsCollection(from: $from, to: $to) {
+              contributionCalendar {
+                totalContributions
+              }
+            }
+          }
+        }
+        """
+
+        let variables: [String: Any] = [
+            "login": username,
+            "from": isoString(from: startOfDay),
+            "to": isoString(from: endOfDay)
+        ]
+
+        let body: [String: Any] = ["query": query, "variables": variables]
+
+        var request = URLRequest(url: graphQLEndpoint)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let http = response as? HTTPURLResponse else {
+            throw GitHubError.invalidResponse
+        }
+
+        guard http.statusCode == 200 else {
+            throw GitHubError.httpError(statusCode: http.statusCode)
+        }
+
+        let graphQLResponse = try JSONDecoder().decode(GraphQLResponse.self, from: data)
+
+        if let errors = graphQLResponse.errors, !errors.isEmpty {
+            throw GitHubError.graphQL(errors.map(\.message).joined(separator: ", "))
+        }
+
+        guard let totalContributions = graphQLResponse.data?.user?.contributionsCollection.contributionCalendar.totalContributions else {
+            throw GitHubError.userNotFound(username)
+        }
+
+        return totalContributions
+    }
+
     // MARK: - Private
 
     /// Uses GraphQL variables to avoid injection via username.
