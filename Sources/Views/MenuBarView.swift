@@ -10,8 +10,8 @@ import SwiftUI
 struct MenuBarView: View {
     private let contentVerticalInset: CGFloat = 8
     private let contentTrailingInset: CGFloat = 8
-    private let contentLeadingInset: CGFloat = 20
-    private let graphLeadingCompensation: CGFloat = 8
+    private let contentLeadingInset: CGFloat = 32
+    private let graphLeadingCompensation: CGFloat = 0
 
     @ObservedObject var appState: AppState
 
