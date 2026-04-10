@@ -232,6 +232,8 @@ struct MenuBarView: View {
     private func summaryRow(_ summary: ContributionSummary) -> some View {
         HStack(spacing: 6) {
             metricChip(title: "Streak", value: "\(summary.currentStreak)d")
+            metricChip(title: "7d total", value: "\(summary.trailingWeekTotal)")
+            metricChip(title: "Vs prev", value: weeklyTrendLabel(summary))
             metricChip(title: "Best", value: bestDayLabel(summary.bestDay))
             metricChip(title: "Avg/day", value: summary.averagePerDay.formatted(.number.precision(.fractionLength(1))))
 
@@ -263,6 +265,16 @@ struct MenuBarView: View {
         let date = day.parsedDate ?? Date()
         let formatter = Date.FormatStyle().month(.abbreviated).day()
         return "\(day.contributionCount) on \(date.formatted(formatter))"
+    }
+
+    private func weeklyTrendLabel(_ summary: ContributionSummary) -> String {
+        let delta = summary.trailingWeekDelta
+        if delta == 0 {
+            return "Flat"
+        }
+
+        let prefix = delta > 0 ? "+" : ""
+        return "\(prefix)\(delta)"
     }
 
     // MARK: - Time Range Picker

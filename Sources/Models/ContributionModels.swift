@@ -99,6 +99,12 @@ struct ContributionSummary {
     let longestStreak: Int
     let bestDay: ContributionDay?
     let averagePerDay: Double
+    let trailingWeekTotal: Int
+    let previousWeekTotal: Int
+
+    var trailingWeekDelta: Int {
+        trailingWeekTotal - previousWeekTotal
+    }
 }
 
 extension ContributionCalendar {
@@ -166,11 +172,17 @@ extension ContributionCalendar {
             return $0.contributionCount < $1.contributionCount
         }
 
+        let trailingWeekTotal = sortedDays.suffix(7).reduce(0) { $0 + $1.contributionCount }
+        let previousWeekSlice = sortedDays.dropLast(min(7, sortedDays.count)).suffix(7)
+        let previousWeekTotal = previousWeekSlice.reduce(0) { $0 + $1.contributionCount }
+
         return ContributionSummary(
             currentStreak: currentStreak,
             longestStreak: longestStreak,
             bestDay: bestDay,
-            averagePerDay: Double(totalContributions) / Double(dayCount)
+            averagePerDay: Double(totalContributions) / Double(dayCount),
+            trailingWeekTotal: trailingWeekTotal,
+            previousWeekTotal: previousWeekTotal
         )
     }
 }
