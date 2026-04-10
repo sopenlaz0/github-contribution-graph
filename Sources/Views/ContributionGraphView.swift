@@ -33,6 +33,7 @@ struct ContributionGraphView: View {
 
     let calendar: ContributionCalendar
     var todayId: String = ""
+    let onOpenDay: (ContributionDay) -> Void
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var hoveredDayId: String?
@@ -97,6 +98,9 @@ struct ContributionGraphView: View {
                                 cellSize: cellSize,
                                 onHover: { hovered in
                                     hoveredDayId = hovered ? day.id : nil
+                                },
+                                onOpen: {
+                                    onOpenDay(day)
                                 }
                             )
                         }
@@ -222,21 +226,37 @@ struct ContributionCellView: View {
     let fillColor: Color
     let cellSize: CGFloat
     let onHover: (Bool) -> Void
+    let onOpen: () -> Void
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 2)
-            .fill(day.isVisible ? fillColor : .clear)
-            .frame(width: cellSize, height: cellSize)
-            .overlay(
-                RoundedRectangle(cornerRadius: 2)
-                    .strokeBorder(borderColor, lineWidth: borderWidth)
-                    .opacity(showBorder ? 1 : 0)
-            )
-            .onHover { hovered in
-                guard day.isVisible else { return }
-                onHover(hovered)
-            }
-            .help(day.isVisible ? ContributionGraphView.tooltipText(for: day) : "")
+        Button(action: onOpen) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(day.isVisible ? fillColor : .clear)
+                .frame(width: cellSize, height: cellSize)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 2)
+                        .strokeBorder(borderColor, lineWidth: borderWidth)
+                        .opacity(showBorder ? 1 : 0)
+                )
+        }
+        .buttonStyle(.plain)
+        .disabled(!day.isVisible)
+        .onHover { hovered in
+            guard day.isVisible else { return }
+            onHover(hovered)
+        }
+        .help(helpText)
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var helpText: String {
+        guard day.isVisible else { return "" }
+        return "\(ContributionGraphView.tooltipText(for: day)). Click to open on GitHub."
+    }
+
+    private var accessibilityLabel: String {
+        guard day.isVisible else { return "No data" }
+        return "\(ContributionGraphView.tooltipText(for: day)). Opens on GitHub."
     }
 
     private var showBorder: Bool { day.isVisible && (isHovered || isToday) }

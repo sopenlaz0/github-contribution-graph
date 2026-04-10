@@ -38,7 +38,7 @@ gh auth login
 - **Dark mode** — proper GitHub dark palette, auto-switches
 - **Time range selector** — last 12 months, this month, or a specific year
 - **Insight chips** — current streak, best day, average/day, and longest streak
-- **Hover details** — hover any square for count + date
+- **Hover details + quick open** — hover any square for count + date, then click to open that day on GitHub
 - **Today highlighted** — today's cell has a distinct border + green badge
 - **Zero config** — uses `gh auth token`, no tokens to paste
 - **Menu bar only** — no dock icon, lightweight

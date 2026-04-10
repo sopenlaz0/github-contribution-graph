@@ -120,7 +120,11 @@ struct MenuBarView: View {
             }
             HStack(spacing: 0) {
                 Spacer(minLength: 0)
-                ContributionGraphView(calendar: calendar, todayId: appState.todayDateString)
+                ContributionGraphView(
+                    calendar: calendar,
+                    todayId: appState.todayDateString,
+                    onOpenDay: openGitHubDay
+                )
                 Spacer(minLength: 0)
             }
             footer
@@ -243,6 +247,14 @@ struct MenuBarView: View {
                     .font(.system(size: 9))
                     .foregroundStyle(.tertiary)
             }
+
+            Button(action: openGitHubProfile) {
+                Image(systemName: "globe")
+                    .font(.system(size: 11))
+            }
+            .buttonStyle(.plain)
+            .padding(.leading, 4)
+            .help("Open GitHub profile")
 
             Button(action: { showSettings = true }) {
                 Image(systemName: "gearshape")
@@ -376,5 +388,22 @@ struct MenuBarView: View {
             Text(message).font(.system(size: 11)).foregroundStyle(.secondary).multilineTextAlignment(.center)
             Button("Retry") { appState.fetchContributions() }.buttonStyle(.borderedProminent).controlSize(.small)
         }.frame(height: 120)
+    }
+
+    private func openGitHubProfile() {
+        guard let url = URL(string: "https://github.com/\(appState.username)") else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    private func openGitHubDay(_ day: ContributionDay) {
+        guard
+            day.isVisible,
+            let encodedUsername = appState.username.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
+            let url = URL(string: "https://github.com/\(encodedUsername)?tab=overview&from=\(day.date)&to=\(day.date)")
+        else {
+            return
+        }
+
+        NSWorkspace.shared.open(url)
     }
 }
