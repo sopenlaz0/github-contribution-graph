@@ -40,6 +40,12 @@ struct ContributionGraphView: View {
 
     private let cellSize: CGFloat = 10
     private let cellSpacing: CGFloat = 3
+    private let dayLabelWidth: CGFloat = 26
+    private let dayLabelTrailingPadding: CGFloat = 4
+
+    private var leadingLabelColumnWidth: CGFloat {
+        dayLabelWidth + dayLabelTrailingPadding
+    }
 
     /// Pre-computed lookup for fast hover info display.
     private var dayLookup: [String: ContributionDay] {
@@ -68,7 +74,7 @@ struct ContributionGraphView: View {
     private var monthLabels: some View {
         HStack(spacing: 0) {
             Text("")
-                .frame(width: 32)
+                .frame(width: leadingLabelColumnWidth)
 
             let months = extractMonthLabels()
             ForEach(months, id: \.offset) { item in
@@ -135,14 +141,14 @@ struct ContributionGraphView: View {
                     Text(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][index])
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
-                        .frame(width: 26, height: cellSize, alignment: .trailing)
+                        .frame(width: dayLabelWidth, height: cellSize, alignment: .trailing)
                 } else {
                     Color.clear
-                        .frame(width: 26, height: cellSize)
+                        .frame(width: dayLabelWidth, height: cellSize)
                 }
             }
         }
-        .padding(.trailing, 4)
+        .padding(.trailing, dayLabelTrailingPadding)
     }
 
     // MARK: - Tooltip

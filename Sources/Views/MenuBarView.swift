@@ -8,6 +8,7 @@ import SwiftUI
 // MARK: - Menu Bar View
 
 struct MenuBarView: View {
+    private let contentInset: CGFloat = 8
 
     @ObservedObject var appState: AppState
 
@@ -177,7 +178,7 @@ struct MenuBarView: View {
             }
             footer
         }
-        .padding(.horizontal, 0)
+        .padding(contentInset)
     }
 
     // MARK: - Header
