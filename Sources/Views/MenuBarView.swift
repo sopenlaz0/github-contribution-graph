@@ -67,29 +67,77 @@ struct MenuBarView: View {
 
     private var needsGHView: some View {
         setupPrompt(
-            icon: "terminal", title: "GitHub CLI not found",
-            subtitle: "Install it with Homebrew, then log in:",
-            commands: ["brew install gh", "gh auth login"]
+            icon: "terminal",
+            title: "Set up GitHub CLI",
+            subtitle: "This app uses your existing gh login. Install it once, then sign in.",
+            steps: [
+                SetupStep(title: "Install GitHub CLI", detail: "Run this once in Terminal.", command: "brew install gh"),
+                SetupStep(title: "Sign in to GitHub", detail: "Authorize gh with your GitHub account.", command: "gh auth login")
+            ],
+            primaryActionTitle: "Copy install command",
+            primaryCommand: "brew install gh",
+            secondaryActionTitle: "GitHub CLI site",
+            secondaryAction: openGitHubCLISite
         )
     }
 
     private var needsLoginView: some View {
         setupPrompt(
-            icon: "person.crop.circle.badge.xmark", title: "Not logged in to GitHub CLI",
-            subtitle: "Run this in your terminal:",
-            commands: ["gh auth login"]
+            icon: "person.crop.circle.badge.xmark",
+            title: "Finish GitHub sign-in",
+            subtitle: "GitHub CLI is installed, but this Mac is not authenticated yet.",
+            steps: [
+                SetupStep(title: "Authenticate with GitHub", detail: "Run this in Terminal and complete the browser flow.", command: "gh auth login")
+            ],
+            primaryActionTitle: "Copy login command",
+            primaryCommand: "gh auth login",
+            secondaryActionTitle: "Open Terminal",
+            secondaryAction: openTerminal
         )
     }
 
-    private func setupPrompt(icon: String, title: String, subtitle: String, commands: [String]) -> some View {
+    private func setupPrompt(
+        icon: String,
+        title: String,
+        subtitle: String,
+        steps: [SetupStep],
+        primaryActionTitle: String,
+        primaryCommand: String,
+        secondaryActionTitle: String,
+        secondaryAction: @escaping () -> Void
+    ) -> some View {
         VStack(spacing: 12) {
-            Image(systemName: icon).font(.system(size: 28)).foregroundStyle(.secondary)
-            Text(title).font(.system(size: 14, weight: .semibold))
-            Text(subtitle).font(.system(size: 11)).foregroundStyle(.secondary)
+            Image(systemName: icon)
+                .font(.system(size: 28))
+                .foregroundStyle(.secondary)
+
+            Text(title)
+                .font(.system(size: 14, weight: .semibold))
+
+            Text(subtitle)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
             VStack(alignment: .leading, spacing: 6) {
-                ForEach(commands, id: \.self) { commandRow($0) }
+                ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
+                    setupStepRow(number: index + 1, step: step)
+                }
             }
             .padding(.vertical, 4)
+
+            HStack(spacing: 8) {
+                Button(primaryActionTitle) {
+                    copyToPasteboard(primaryCommand)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+
+                Button(secondaryActionTitle, action: secondaryAction)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+            }
+
             retryButton
         }
         .padding(.vertical, 12)
@@ -289,8 +337,7 @@ struct MenuBarView: View {
                 .textSelection(.enabled)
 
             Button {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(command, forType: .string)
+                copyToPasteboard(command)
             } label: {
                 Image(systemName: "doc.on.doc")
                     .font(.system(size: 9))
@@ -301,6 +348,28 @@ struct MenuBarView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(RoundedRectangle(cornerRadius: 6).fill(.quaternary.opacity(0.5)))
+    }
+
+    private func setupStepRow(number: Int, step: SetupStep) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text("\(number)")
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .frame(width: 18, height: 18)
+                .background(Circle().fill(.quaternary))
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(step.title)
+                    .font(.system(size: 11, weight: .semibold))
+                Text(step.detail)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                commandRow(step.command)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 8).fill(.quaternary.opacity(0.3)))
     }
 
     private var retryButton: some View {
@@ -395,6 +464,11 @@ struct MenuBarView: View {
         NSWorkspace.shared.open(url)
     }
 
+    private func openGitHubCLISite() {
+        guard let url = URL(string: "https://cli.github.com/") else { return }
+        NSWorkspace.shared.open(url)
+    }
+
     private func openGitHubDay(_ day: ContributionDay) {
         guard
             day.isVisible,
@@ -406,4 +480,20 @@ struct MenuBarView: View {
 
         NSWorkspace.shared.open(url)
     }
+
+    private func openTerminal() {
+        let terminalURL = URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app")
+        NSWorkspace.shared.openApplication(at: terminalURL, configuration: .init())
+    }
+
+    private func copyToPasteboard(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+}
+
+private struct SetupStep {
+    let title: String
+    let detail: String
+    let command: String
 }
