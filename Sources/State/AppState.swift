@@ -128,6 +128,8 @@ enum MenuBarDisplayMode: String, CaseIterable, Codable {
 @MainActor
 final class AppState: ObservableObject {
 
+    private static let staleRefreshInterval: TimeInterval = 60 * 15
+
     private struct CachedContributionState: Codable {
         let username: String
         let selectedRange: ContributionRange
@@ -212,6 +214,16 @@ final class AppState: ObservableObject {
         }
     }
 
+    var syncStatusLabel: String? {
+        guard let lastUpdated else { return nil }
+        return "Updated \(lastUpdated.formatted(.relative(presentation: .named))) · \(lastUpdated.formatted(date: .omitted, time: .shortened))"
+    }
+
+    var shouldRefreshOnOpen: Bool {
+        guard let lastUpdated else { return calendar == nil }
+        return Date().timeIntervalSince(lastUpdated) >= Self.staleRefreshInterval
+    }
+
     /// Today's date as "yyyy-MM-dd" for matching against contribution days.
     private static let todayFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -273,6 +285,11 @@ final class AppState: ObservableObject {
     }
 
     func refreshContributions() {
+        fetchContributions()
+    }
+
+    func refreshContributionsIfNeeded() {
+        guard shouldRefreshOnOpen else { return }
         fetchContributions()
     }
 

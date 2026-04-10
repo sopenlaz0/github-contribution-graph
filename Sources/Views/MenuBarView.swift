@@ -26,8 +26,8 @@ struct MenuBarView: View {
         .onAppear {
             if !appState.isLoggedIn {
                 appState.checkAuth()
-            } else if appState.calendar == nil {
-                appState.fetchContributions()
+            } else {
+                appState.refreshContributionsIfNeeded()
             }
         }
     }
@@ -236,8 +236,8 @@ struct MenuBarView: View {
 
             Spacer()
 
-            if let lastUpdated = appState.lastUpdated {
-                Text("Updated \(lastUpdated.formatted(.relative(presentation: .named)))")
+            if let syncStatusLabel = appState.syncStatusLabel {
+                Text(syncStatusLabel)
                     .font(.system(size: 9))
                     .foregroundStyle(.tertiary)
             }
