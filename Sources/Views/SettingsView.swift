@@ -94,7 +94,6 @@ struct SettingsView: View {
 
             Picker("", selection: selectedRangeBinding) {
                 Text("Last 12 months").tag(ContributionRange.last12Months)
-                Text("This month").tag(ContributionRange.thisMonth)
                 ForEach(appState.availableYears, id: \.self) { year in
                     Text(String(year)).tag(ContributionRange.year(year))
                 }

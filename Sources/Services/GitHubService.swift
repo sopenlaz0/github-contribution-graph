@@ -174,15 +174,10 @@ final class GitHubService {
 
     private func dateRange(for range: ContributionRange) -> (from: String, to: String)? {
         let calendar = Calendar(identifier: .gregorian)
-        let now = Date()
 
         switch range {
         case .last12Months:
             return nil
-        case .thisMonth:
-            let components = calendar.dateComponents([.year, .month], from: now)
-            guard let startOfMonth = calendar.date(from: components) else { return nil }
-            return (isoString(from: startOfMonth), isoString(from: now))
         case .year(let year):
             var startComponents = DateComponents()
             startComponents.year = year

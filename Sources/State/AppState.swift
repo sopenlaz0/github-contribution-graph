@@ -20,7 +20,6 @@ enum AuthStatus: Equatable {
 
 enum ContributionRange: Hashable, Codable {
     case last12Months
-    case thisMonth
     case year(Int)
 
     private enum CodingKeys: String, CodingKey {
@@ -42,7 +41,7 @@ enum ContributionRange: Hashable, Codable {
         case .last12Months:
             self = .last12Months
         case .thisMonth:
-            self = .thisMonth
+            self = .last12Months
         case .year:
             self = .year(try container.decode(Int.self, forKey: .year))
         }
@@ -54,8 +53,6 @@ enum ContributionRange: Hashable, Codable {
         switch self {
         case .last12Months:
             try container.encode(Kind.last12Months, forKey: .kind)
-        case .thisMonth:
-            try container.encode(Kind.thisMonth, forKey: .kind)
         case .year(let year):
             try container.encode(Kind.year, forKey: .kind)
             try container.encode(year, forKey: .year)
@@ -68,10 +65,6 @@ enum ContributionRange: Hashable, Codable {
         switch self {
         case .last12Months:
             return nil
-        case .thisMonth:
-            let components = calendar.dateComponents([.year, .month], from: referenceDate)
-            guard let start = calendar.date(from: components) else { return nil }
-            return start...referenceDate
         case .year(let year):
             var startComponents = DateComponents()
             startComponents.year = year
@@ -188,8 +181,6 @@ final class AppState: ObservableObject {
         switch selectedRange {
         case .last12Months:
             return "in the last year"
-        case .thisMonth:
-            return "this month"
         case .year(let year):
             return "in \(year)"
         }
@@ -199,8 +190,6 @@ final class AppState: ObservableObject {
         switch selectedRange {
         case .last12Months:
             return "Last 12 months"
-        case .thisMonth:
-            return "This month"
         case .year(let year):
             return String(year)
         }

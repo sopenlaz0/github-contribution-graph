@@ -21,7 +21,7 @@ struct MenuBarView: View {
                 mainContent
             }
         }
-        .frame(width: popoverWidth)
+        .frame(width: 700)
         .padding(16)
         .onAppear {
             if !appState.isLoggedIn {
@@ -177,7 +177,7 @@ struct MenuBarView: View {
             }
             footer
         }
-        .padding(.horizontal, compactContentInset)
+        .padding(.horizontal, 0)
     }
 
     // MARK: - Header
@@ -282,7 +282,6 @@ struct MenuBarView: View {
     private var rangePicker: some View {
         Picker("", selection: selectedRangeBinding) {
             Text("Last 12 months").tag(ContributionRange.last12Months)
-            Text("This month").tag(ContributionRange.thisMonth)
             ForEach(appState.availableYears, id: \.self) { year in
                 Text(String(year)).tag(ContributionRange.year(year))
             }
@@ -413,8 +412,6 @@ struct MenuBarView: View {
         switch appState.selectedRange {
         case .last12Months:
             return "Fetching contributions..."
-        case .thisMonth:
-            return "Loading this month..."
         case .year(let year):
             return "Loading \(year) contributions..."
         }
@@ -425,24 +422,6 @@ struct MenuBarView: View {
             get: { appState.selectedRange },
             set: { appState.selectRange($0) }
         )
-    }
-
-    private var popoverWidth: CGFloat {
-        switch appState.selectedRange {
-        case .thisMonth:
-            return 430
-        case .last12Months, .year:
-            return 700
-        }
-    }
-
-    private var compactContentInset: CGFloat {
-        switch appState.selectedRange {
-        case .thisMonth:
-            return 12
-        case .last12Months, .year:
-            return 0
-        }
     }
 
     // MARK: - Error Views
