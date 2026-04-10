@@ -159,6 +159,8 @@ struct MenuBarView: View {
             .disabled(appState.isLoading)
             .opacity(appState.isLoading ? 0.5 : 1)
             .padding(.leading, 4)
+            .keyboardShortcut("r", modifiers: .command)
+            .help("Refresh")
         }
     }
 
@@ -248,6 +250,8 @@ struct MenuBarView: View {
             }
             .buttonStyle(.plain)
             .padding(.leading, 4)
+            .keyboardShortcut(",", modifiers: .command)
+            .help("Settings")
 
             Button(action: { NSApplication.shared.terminate(nil) }) {
                 Image(systemName: "power")
@@ -255,6 +259,7 @@ struct MenuBarView: View {
             }
             .buttonStyle(.plain)
             .padding(.leading, 4)
+            .keyboardShortcut("q", modifiers: .command)
             .help("Quit")
         }
     }
@@ -295,6 +300,7 @@ struct MenuBarView: View {
         }
         .buttonStyle(.borderedProminent)
         .controlSize(.small)
+        .keyboardShortcut("r", modifiers: .command)
     }
 
     // MARK: - Loading

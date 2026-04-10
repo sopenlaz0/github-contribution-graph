@@ -37,6 +37,7 @@ struct SettingsView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
+            .keyboardShortcut(.escape, modifiers: [])
 
             Spacer()
 
@@ -134,6 +135,7 @@ struct SettingsView: View {
             .buttonStyle(.plain)
             .font(.system(size: 10))
             .foregroundStyle(.secondary)
+            .keyboardShortcut("q", modifiers: .command)
 
             Spacer()
 
@@ -142,6 +144,7 @@ struct SettingsView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
+            .keyboardShortcut(.defaultAction)
         }
     }
 
