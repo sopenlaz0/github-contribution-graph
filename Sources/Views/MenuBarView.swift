@@ -12,6 +12,7 @@ struct MenuBarView: View {
     private let contentTrailingInset: CGFloat = 8
     private let contentLeadingInset: CGFloat = 32
     private let graphLeadingCompensation: CGFloat = 0
+    private let trailingControlSpacing: CGFloat = 10
 
     @ObservedObject var appState: AppState
 
@@ -200,28 +201,11 @@ struct MenuBarView: View {
                 todayBadge(count: today)
             }
 
-            Spacer()
+            Spacer(minLength: 12)
 
-            rangePicker
-
-            Button(action: { appState.refreshContributions() }) {
-                Group {
-                    if appState.isLoading {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 11))
-                    }
-                }
-            }
-            .buttonStyle(.plain)
-            .disabled(appState.isLoading)
-            .opacity(appState.isLoading ? 0.5 : 1)
-            .padding(.leading, 4)
-            .keyboardShortcut("r", modifiers: .command)
-            .help("Refresh")
+            headerTrailingControls
         }
+        .frame(maxWidth: .infinity)
     }
 
     private func todayBadge(count: Int) -> some View {
@@ -309,6 +293,37 @@ struct MenuBarView: View {
 
             Spacer()
 
+            footerTrailingControls
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var headerTrailingControls: some View {
+        HStack(spacing: trailingControlSpacing) {
+            rangePicker
+
+            Button(action: { appState.refreshContributions() }) {
+                Group {
+                    if appState.isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 11))
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .disabled(appState.isLoading)
+            .opacity(appState.isLoading ? 0.5 : 1)
+            .keyboardShortcut("r", modifiers: .command)
+            .help("Refresh")
+        }
+        .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+
+    private var footerTrailingControls: some View {
+        HStack(spacing: trailingControlSpacing) {
             if let syncStatusLabel = appState.syncStatusLabel {
                 Text(syncStatusLabel)
                     .font(.system(size: 9))
@@ -320,7 +335,6 @@ struct MenuBarView: View {
                     .font(.system(size: 11))
             }
             .buttonStyle(.plain)
-            .padding(.leading, 4)
             .help("Open GitHub profile")
 
             Button(action: { showSettings = true }) {
@@ -328,7 +342,6 @@ struct MenuBarView: View {
                     .font(.system(size: 11))
             }
             .buttonStyle(.plain)
-            .padding(.leading, 4)
             .keyboardShortcut(",", modifiers: .command)
             .help("Settings")
 
@@ -337,10 +350,10 @@ struct MenuBarView: View {
                     .font(.system(size: 11))
             }
             .buttonStyle(.plain)
-            .padding(.leading, 4)
             .keyboardShortcut("q", modifiers: .command)
             .help("Quit")
         }
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
     // MARK: - Shared Components
