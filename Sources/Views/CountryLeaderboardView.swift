@@ -8,35 +8,29 @@ struct CountryLeaderboardView: View {
     @ObservedObject var appState: AppState
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             header
             content
         }
-        .padding(10)
-        .background(RoundedRectangle(cornerRadius: 12).fill(.quaternary.opacity(0.28)))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(.quaternary.opacity(0.7), lineWidth: 1)
-        )
+        .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear {
             appState.refreshCountryLeaderboardIfNeeded()
         }
     }
 
     private var header: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "flag.checkered")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.green)
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Label("Country preview", systemImage: "flag.checkered")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.primary)
 
-            Text("Country rank")
-                .font(.system(size: 11, weight: .semibold))
+                Text("Top seed users + your account for \(appState.contributionPeriodLabel)")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+            }
 
-            Text(appState.contributionPeriodLabel)
-                .font(.system(size: 9))
-                .foregroundStyle(.tertiary)
-
-            Spacer(minLength: 8)
+            Spacer(minLength: 12)
 
             Picker("", selection: selectedCountryBinding) {
                 ForEach(appState.countryOptions) { country in
@@ -48,19 +42,6 @@ struct CountryLeaderboardView: View {
             .controlSize(.small)
             .fixedSize()
             .disabled(appState.countryLeaderboardStatus == .loading)
-
-            Button(action: { appState.refreshCountryLeaderboard() }) {
-                if appState.countryLeaderboardStatus == .loading {
-                    ProgressView()
-                        .controlSize(.small)
-                } else {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 10))
-                }
-            }
-            .buttonStyle(.plain)
-            .disabled(appState.countryLeaderboardStatus == .loading)
-            .help("Refresh country ranking")
         }
     }
 
@@ -83,11 +64,7 @@ struct CountryLeaderboardView: View {
     }
 
     private var idleState: some View {
-        HStack(spacing: 8) {
-            Text("Load the \(appState.selectedCountryTitle) leaderboard for this period.")
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-            Spacer()
+        stateCard(systemImage: "flag", title: "Load \(appState.selectedCountryTitle)", subtitle: "Fetch the fast country preview for this period.") {
             Button("Load") { appState.refreshCountryLeaderboard() }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
@@ -95,84 +72,127 @@ struct CountryLeaderboardView: View {
     }
 
     private var loadingState: some View {
-        HStack(spacing: 8) {
+        stateCard(systemImage: "arrow.triangle.2.circlepath", title: "Ranking \(appState.selectedCountryTitle)…", subtitle: "Fetching top seed users and your account.") {
             ProgressView()
                 .controlSize(.small)
-            Text("Ranking \(appState.selectedCountryTitle) users…")
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-            Spacer()
         }
-        .frame(height: 26)
     }
 
     private func errorState(_ message: String) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "exclamationmark.triangle")
-                .foregroundStyle(.orange)
-            Text(message)
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-            Spacer()
+        stateCard(systemImage: "exclamationmark.triangle", title: "Couldn’t load country preview", subtitle: message) {
             Button("Retry") { appState.refreshCountryLeaderboard() }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
         }
     }
 
+    private func stateCard<Action: View>(
+        systemImage: String,
+        title: String,
+        subtitle: String,
+        @ViewBuilder action: () -> Action
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(.green)
+                .frame(width: 34, height: 34)
+                .background(Circle().fill(.green.opacity(0.12)))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                Text(subtitle)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 8)
+            action()
+        }
+        .padding(14)
+        .frame(minHeight: 112)
+        .background(RoundedRectangle(cornerRadius: 12).fill(.quaternary.opacity(0.26)))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(.quaternary.opacity(0.65), lineWidth: 1)
+        )
+    }
+
     private func leaderboard(_ snapshot: CountryLeaderboardSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            rankSummary(snapshot)
-            topRows(snapshot.entries.prefix(5), currentUsername: appState.username)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
+                rankCard(snapshot)
+                    .frame(width: 176)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Preview top 5")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
+
+                    topRows(snapshot.entries.prefix(5), currentUsername: appState.username)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
             footer(snapshot)
         }
     }
 
-    private func rankSummary(_ snapshot: CountryLeaderboardSnapshot) -> some View {
+    private func rankCard(_ snapshot: CountryLeaderboardSnapshot) -> some View {
         let currentEntry = snapshot.entry(for: appState.username)
         let currentRank = snapshot.rank(for: appState.username)
 
-        return HStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(snapshot.isComplete ? "Your rank" : "Preview rank")
-                    .font(.system(size: 9))
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(snapshot.isComplete ? "Your rank" : "Your preview rank")
+                    .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(.tertiary)
-
-                Text(currentRank.map { "#\($0)" } ?? "Unranked")
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundStyle(currentRank == 1 ? .green : .primary)
+                Spacer()
+                if currentRank == 1 {
+                    Text("#1")
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(.green))
+                }
             }
-            .frame(width: 72, alignment: .leading)
 
-            Divider()
-                .frame(height: 30)
+            Text(currentRank.map { "#\($0)" } ?? "—")
+                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .foregroundStyle(currentRank == 1 ? .green : .primary)
+                .lineLimit(1)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("@\(appState.username)")
                     .font(.system(size: 10, weight: .medium))
-                Text(currentEntry.map { "\($0.contributions.formatted()) contributions" } ?? "Not in committers.top seed list")
+                    .lineLimit(1)
+
+                Text(currentEntry.map { "\($0.contributions.formatted()) contributions" } ?? "Not in seed list")
                     .font(.system(size: 9))
                     .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 0)
-
-            if currentRank == 1 {
-                Text("#1")
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Capsule().fill(.green))
+                    .lineLimit(1)
             }
         }
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: 132, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 12).fill(.green.opacity(0.10)))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(.green.opacity(0.22), lineWidth: 1)
+        )
     }
 
     private func topRows(_ entries: ArraySlice<CountryLeaderboardEntry>, currentUsername: String) -> some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 5) {
             ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                leaderboardRow(rank: index + 1, entry: entry, isCurrentUser: isCurrentUser(entry, currentUsername: currentUsername))
+                leaderboardRow(
+                    rank: index + 1,
+                    entry: entry,
+                    isCurrentUser: isCurrentUser(entry, currentUsername: currentUsername)
+                )
             }
         }
     }
@@ -191,6 +211,7 @@ struct CountryLeaderboardView: View {
                     .font(.system(size: 10, weight: isCurrentUser ? .bold : .medium))
                     .foregroundStyle(isCurrentUser ? .green : .primary)
                     .lineLimit(1)
+                    .truncationMode(.middle)
 
                 if entry.isSuspiciouslyAutomated {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -204,10 +225,12 @@ struct CountryLeaderboardView: View {
                 Text(entry.contributions.formatted())
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
             .padding(.horizontal, 8)
-            .padding(.vertical, 5)
+            .padding(.vertical, 6)
             .background(rowBackground(isCurrentUser: isCurrentUser))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
         .help("Open @\(entry.username) on GitHub")
@@ -225,6 +248,7 @@ struct CountryLeaderboardView: View {
             Text(footerSummary(snapshot))
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
+                .lineLimit(1)
 
             Spacer()
 
