@@ -182,6 +182,7 @@ struct MenuBarView: View {
 
     private func contributionView(_ calendar: ContributionCalendar) -> some View {
         VStack(alignment: .leading, spacing: 10) {
+            panelSwitcherBar
             header(totalContributions: calendar.totalContributions)
 
             switch selectedPanel {
@@ -219,6 +220,16 @@ struct MenuBarView: View {
     }
 
     // MARK: - Header
+
+    private var panelSwitcherBar: some View {
+        HStack {
+            Spacer(minLength: 0)
+            panelPicker
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.bottom, 2)
+    }
 
     private func header(totalContributions: Int) -> some View {
         HStack(alignment: .center, spacing: 10) {
@@ -340,7 +351,7 @@ struct MenuBarView: View {
         .pickerStyle(.menu)
         .controlSize(.small)
         .fixedSize()
-        .disabled(appState.isLoading)
+        .disabled(selectedPanelIsRefreshing)
     }
 
     // MARK: - Footer
@@ -360,8 +371,6 @@ struct MenuBarView: View {
 
     private var headerTrailingControls: some View {
         HStack(spacing: trailingControlSpacing) {
-            panelPicker
-
             if selectedPanel == .country {
                 countryPicker
             }
