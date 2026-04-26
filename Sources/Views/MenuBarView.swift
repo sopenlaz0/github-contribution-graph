@@ -8,6 +8,20 @@ import SwiftUI
 // MARK: - Menu Bar View
 
 struct MenuBarView: View {
+    private enum ContentPanel: String, CaseIterable {
+        case graph
+        case country
+
+        var title: String {
+            switch self {
+            case .graph:
+                return "Graph"
+            case .country:
+                return "Country"
+            }
+        }
+    }
+
     private let contentVerticalInset: CGFloat = 8
     private let contentTrailingInset: CGFloat = 8
     private let contentLeadingInset: CGFloat = 32
@@ -17,6 +31,7 @@ struct MenuBarView: View {
     @ObservedObject var appState: AppState
 
     @State private var showSettings = false
+    @State private var selectedPanel: ContentPanel = .graph
 
     var body: some View {
         VStack(spacing: 0) {
@@ -168,6 +183,25 @@ struct MenuBarView: View {
     private func contributionView(_ calendar: ContributionCalendar) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             header(totalContributions: calendar.totalContributions)
+
+            switch selectedPanel {
+            case .graph:
+                graphPanel(calendar)
+            case .country:
+                CountryLeaderboardView(appState: appState)
+                    .frame(minHeight: 150)
+            }
+
+            footer
+        }
+        .padding(.top, contentVerticalInset)
+        .padding(.bottom, contentVerticalInset)
+        .padding(.trailing, contentTrailingInset)
+        .padding(.leading, contentLeadingInset)
+    }
+
+    private func graphPanel(_ calendar: ContributionCalendar) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
             if let summary = appState.contributionSummary {
                 summaryRow(summary)
             }
@@ -181,13 +215,7 @@ struct MenuBarView: View {
                 .padding(.leading, graphLeadingCompensation)
                 Spacer(minLength: 0)
             }
-            CountryLeaderboardView(appState: appState)
-            footer
         }
-        .padding(.top, contentVerticalInset)
-        .padding(.bottom, contentVerticalInset)
-        .padding(.trailing, contentTrailingInset)
-        .padding(.leading, contentLeadingInset)
     }
 
     // MARK: - Header
@@ -270,7 +298,19 @@ struct MenuBarView: View {
         return "\(prefix)\(delta)"
     }
 
-    // MARK: - Time Range Picker
+    // MARK: - Header Controls
+
+    private var panelPicker: some View {
+        Picker("", selection: $selectedPanel) {
+            ForEach(ContentPanel.allCases, id: \.self) { panel in
+                Text(panel.title).tag(panel)
+            }
+        }
+        .labelsHidden()
+        .pickerStyle(.segmented)
+        .controlSize(.small)
+        .frame(width: 150)
+    }
 
     private var rangePicker: some View {
         Picker("", selection: selectedRangeBinding) {
@@ -301,9 +341,10 @@ struct MenuBarView: View {
 
     private var headerTrailingControls: some View {
         HStack(spacing: trailingControlSpacing) {
+            panelPicker
             rangePicker
 
-            Button(action: { appState.refreshContributions() }) {
+            Button(action: refreshSelectedPanel) {
                 Group {
                     if appState.isLoading {
                         ProgressView()
@@ -318,9 +359,18 @@ struct MenuBarView: View {
             .disabled(appState.isLoading)
             .opacity(appState.isLoading ? 0.5 : 1)
             .keyboardShortcut("r", modifiers: .command)
-            .help("Refresh")
+            .help(selectedPanel == .graph ? "Refresh graph" : "Refresh country preview")
         }
         .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+
+    private func refreshSelectedPanel() {
+        switch selectedPanel {
+        case .graph:
+            appState.refreshContributions()
+        case .country:
+            appState.refreshCountryLeaderboard()
+        }
     }
 
     private var footerTrailingControls: some View {
