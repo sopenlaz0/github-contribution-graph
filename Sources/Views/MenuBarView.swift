@@ -221,12 +221,10 @@ struct MenuBarView: View {
     // MARK: - Header
 
     private func header(totalContributions: Int) -> some View {
-        HStack(alignment: .center, spacing: 8) {
-            Text("\(totalContributions.formatted()) contributions \(appState.contributionPeriodLabel)")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
+        HStack(alignment: .center, spacing: 10) {
+            headerTitle(totalContributions: totalContributions)
 
-            if let today = appState.todayContributions {
+            if selectedPanel == .graph, let today = appState.todayContributions {
                 todayBadge(count: today)
             }
 
@@ -235,6 +233,25 @@ struct MenuBarView: View {
             headerTrailingControls
         }
         .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private func headerTitle(totalContributions: Int) -> some View {
+        switch selectedPanel {
+        case .graph:
+            Text("\(totalContributions.formatted()) contributions \(appState.contributionPeriodLabel)")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+        case .country:
+            VStack(alignment: .leading, spacing: 2) {
+                Label("Country preview", systemImage: "flag.checkered")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.primary)
+                Text("Top seed users + your account for \(appState.contributionPeriodLabel)")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+            }
+        }
     }
 
     private func todayBadge(count: Int) -> some View {
@@ -330,7 +347,9 @@ struct MenuBarView: View {
 
     private var footer: some View {
         HStack {
-            ContributionLegend()
+            if selectedPanel == .graph {
+                ContributionLegend()
+            }
 
             Spacer()
 
@@ -342,11 +361,16 @@ struct MenuBarView: View {
     private var headerTrailingControls: some View {
         HStack(spacing: trailingControlSpacing) {
             panelPicker
+
+            if selectedPanel == .country {
+                countryPicker
+            }
+
             rangePicker
 
             Button(action: refreshSelectedPanel) {
                 Group {
-                    if appState.isLoading {
+                    if selectedPanelIsRefreshing {
                         ProgressView()
                             .controlSize(.small)
                     } else {
@@ -356,12 +380,41 @@ struct MenuBarView: View {
                 }
             }
             .buttonStyle(.plain)
-            .disabled(appState.isLoading)
-            .opacity(appState.isLoading ? 0.5 : 1)
+            .disabled(selectedPanelIsRefreshing)
+            .opacity(selectedPanelIsRefreshing ? 0.5 : 1)
             .keyboardShortcut("r", modifiers: .command)
             .help(selectedPanel == .graph ? "Refresh graph" : "Refresh country preview")
         }
         .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+
+    private var countryPicker: some View {
+        Picker("", selection: selectedCountryBinding) {
+            ForEach(appState.countryOptions) { country in
+                Text(country.title).tag(country.slug)
+            }
+        }
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .controlSize(.small)
+        .frame(width: 150)
+        .disabled(appState.countryLeaderboardStatus == .loading)
+    }
+
+    private var selectedCountryBinding: Binding<String> {
+        Binding(
+            get: { appState.selectedCountrySlug },
+            set: { appState.selectCountry($0) }
+        )
+    }
+
+    private var selectedPanelIsRefreshing: Bool {
+        switch selectedPanel {
+        case .graph:
+            return appState.isLoading
+        case .country:
+            return appState.countryLeaderboardStatus == .loading
+        }
     }
 
     private func refreshSelectedPanel() {

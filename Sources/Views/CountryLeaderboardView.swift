@@ -8,41 +8,11 @@ struct CountryLeaderboardView: View {
     @ObservedObject var appState: AppState
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            header
-            content
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .onAppear {
-            appState.refreshCountryLeaderboardIfNeeded()
-        }
-    }
-
-    private var header: some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Label("Country preview", systemImage: "flag.checkered")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.primary)
-
-                Text("Top seed users + your account for \(appState.contributionPeriodLabel)")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.tertiary)
+        content
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onAppear {
+                appState.refreshCountryLeaderboardIfNeeded()
             }
-
-            Spacer(minLength: 12)
-
-            Picker("", selection: selectedCountryBinding) {
-                ForEach(appState.countryOptions) { country in
-                    Text(country.title).tag(country.slug)
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.menu)
-            .controlSize(.small)
-            .fixedSize()
-            .disabled(appState.countryLeaderboardStatus == .loading)
-        }
     }
 
     @ViewBuilder
@@ -264,13 +234,6 @@ struct CountryLeaderboardView: View {
         }
 
         return "Fast preview · fetched \(snapshot.fetchedUserCount) of \(snapshot.seedUserCount) seed users"
-    }
-
-    private var selectedCountryBinding: Binding<String> {
-        Binding(
-            get: { appState.selectedCountrySlug },
-            set: { appState.selectCountry($0) }
-        )
     }
 
     private func isCurrentUser(_ entry: CountryLeaderboardEntry, currentUsername: String) -> Bool {
