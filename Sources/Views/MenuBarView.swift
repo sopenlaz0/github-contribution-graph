@@ -181,10 +181,10 @@ struct MenuBarView: View {
     // MARK: - Contribution View
 
     private func contributionView(_ calendar: ContributionCalendar) -> some View {
-        VStack(alignment: .leading, spacing: selectedPanel == .country ? 14 : 10) {
+        VStack(alignment: .leading, spacing: 12) {
             panelSwitcherBar
             header(totalContributions: calendar.totalContributions)
-                .padding(.bottom, selectedPanel == .country ? 6 : 0)
+                .padding(.bottom, 4)
 
             switch selectedPanel {
             case .graph:
@@ -229,7 +229,7 @@ struct MenuBarView: View {
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity)
-        .padding(.bottom, 2)
+        .padding(.bottom, 6)
     }
 
     private func header(totalContributions: Int) -> some View {
