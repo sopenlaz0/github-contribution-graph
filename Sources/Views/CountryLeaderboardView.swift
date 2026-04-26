@@ -5,6 +5,20 @@
 import SwiftUI
 
 struct CountryLeaderboardView: View {
+    private enum Layout {
+        static let panelSpacing: CGFloat = 12
+        static let columnSpacing: CGFloat = 16
+        static let listSpacing: CGFloat = 8
+        static let rowSpacing: CGFloat = 6
+        static let rowHorizontalPadding: CGFloat = 10
+        static let rowVerticalPadding: CGFloat = 7
+        static let cardPadding: CGFloat = 14
+        static let rankCardWidth: CGFloat = 176
+        static let rankColumnWidth: CGFloat = 30
+        static let stateIconSize: CGFloat = 34
+        static let cornerRadius: CGFloat = 12
+    }
+
     @ObservedObject var appState: AppState
 
     var body: some View {
@@ -62,11 +76,11 @@ struct CountryLeaderboardView: View {
         subtitle: String,
         @ViewBuilder action: () -> Action
     ) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Layout.panelSpacing) {
             Image(systemName: systemImage)
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(.green)
-                .frame(width: 34, height: 34)
+                .frame(width: Layout.stateIconSize, height: Layout.stateIconSize)
                 .background(Circle().fill(.green.opacity(0.12)))
 
             VStack(alignment: .leading, spacing: 3) {
@@ -81,22 +95,22 @@ struct CountryLeaderboardView: View {
             Spacer(minLength: 8)
             action()
         }
-        .padding(14)
+        .padding(Layout.cardPadding)
         .frame(minHeight: 112)
-        .background(RoundedRectangle(cornerRadius: 12).fill(.quaternary.opacity(0.26)))
+        .background(RoundedRectangle(cornerRadius: Layout.cornerRadius).fill(.quaternary.opacity(0.26)))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: Layout.cornerRadius)
                 .strokeBorder(.quaternary.opacity(0.65), lineWidth: 1)
         )
     }
 
     private func leaderboard(_ snapshot: CountryLeaderboardSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 12) {
+        VStack(alignment: .leading, spacing: Layout.panelSpacing) {
+            HStack(alignment: .top, spacing: Layout.columnSpacing) {
                 rankCard(snapshot)
-                    .frame(width: 176)
+                    .frame(width: Layout.rankCardWidth)
 
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: Layout.listSpacing) {
                     Text("Preview top 5")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.secondary)
@@ -114,7 +128,7 @@ struct CountryLeaderboardView: View {
         let currentEntry = snapshot.entry(for: appState.username)
         let currentRank = snapshot.rank(for: appState.username)
 
-        return VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: Layout.listSpacing) {
             HStack {
                 Text(snapshot.isComplete ? "Your rank" : "Your preview rank")
                     .font(.system(size: 9, weight: .medium))
@@ -146,17 +160,17 @@ struct CountryLeaderboardView: View {
                     .lineLimit(1)
             }
         }
-        .padding(12)
+        .padding(Layout.cardPadding)
         .frame(maxWidth: .infinity, minHeight: 132, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(.green.opacity(0.10)))
+        .background(RoundedRectangle(cornerRadius: Layout.cornerRadius).fill(.green.opacity(0.10)))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: Layout.cornerRadius)
                 .strokeBorder(.green.opacity(0.22), lineWidth: 1)
         )
     }
 
     private func topRows(_ entries: ArraySlice<CountryLeaderboardEntry>, currentUsername: String) -> some View {
-        VStack(spacing: 5) {
+        VStack(spacing: Layout.rowSpacing) {
             ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                 leaderboardRow(
                     rank: index + 1,
@@ -175,7 +189,7 @@ struct CountryLeaderboardView: View {
                 Text("#\(rank)")
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
                     .foregroundStyle(rank <= 3 ? .green : .secondary)
-                    .frame(width: 30, alignment: .leading)
+                    .frame(width: Layout.rankColumnWidth, alignment: .leading)
 
                 Text(entry.username)
                     .font(.system(size: 10, weight: isCurrentUser ? .bold : .medium))
@@ -197,8 +211,8 @@ struct CountryLeaderboardView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            .padding(.horizontal, Layout.rowHorizontalPadding)
+            .padding(.vertical, Layout.rowVerticalPadding)
             .background(rowBackground(isCurrentUser: isCurrentUser))
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }

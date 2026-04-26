@@ -22,11 +22,19 @@ struct MenuBarView: View {
         }
     }
 
-    private let contentVerticalInset: CGFloat = 8
-    private let contentTrailingInset: CGFloat = 8
-    private let contentLeadingInset: CGFloat = 32
-    private let graphLeadingCompensation: CGFloat = 0
-    private let trailingControlSpacing: CGFloat = 10
+    private enum Layout {
+        static let popoverWidth: CGFloat = 700
+        static let outerPadding: CGFloat = 16
+        static let contentVerticalInset: CGFloat = 8
+        static let contentLeadingInset: CGFloat = 32
+        static let contentTrailingInset: CGFloat = 8
+        static let panelSpacing: CGFloat = 12
+        static let switcherBottomPadding: CGFloat = 8
+        static let headerBottomPadding: CGFloat = 6
+        static let controlSpacing: CGFloat = 10
+        static let panelMinHeight: CGFloat = 184
+        static let graphLeadingCompensation: CGFloat = 0
+    }
 
     @ObservedObject var appState: AppState
 
@@ -41,8 +49,8 @@ struct MenuBarView: View {
                 mainContent
             }
         }
-        .frame(width: 700)
-        .padding(16)
+        .frame(width: Layout.popoverWidth)
+        .padding(Layout.outerPadding)
         .onAppear {
             if !appState.isLoggedIn {
                 appState.checkAuth()
@@ -181,25 +189,26 @@ struct MenuBarView: View {
     // MARK: - Contribution View
 
     private func contributionView(_ calendar: ContributionCalendar) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Layout.panelSpacing) {
             panelSwitcherBar
             header(totalContributions: calendar.totalContributions)
-                .padding(.bottom, 4)
+                .padding(.bottom, Layout.headerBottomPadding)
 
             switch selectedPanel {
             case .graph:
                 graphPanel(calendar)
+                    .frame(minHeight: Layout.panelMinHeight, alignment: .top)
             case .country:
                 CountryLeaderboardView(appState: appState)
-                    .frame(minHeight: 150)
+                    .frame(minHeight: Layout.panelMinHeight, alignment: .top)
             }
 
             footer
         }
-        .padding(.top, contentVerticalInset)
-        .padding(.bottom, contentVerticalInset)
-        .padding(.trailing, contentTrailingInset)
-        .padding(.leading, contentLeadingInset)
+        .padding(.top, Layout.contentVerticalInset)
+        .padding(.bottom, Layout.contentVerticalInset)
+        .padding(.trailing, Layout.contentTrailingInset)
+        .padding(.leading, Layout.contentLeadingInset)
     }
 
     private func graphPanel(_ calendar: ContributionCalendar) -> some View {
@@ -214,7 +223,7 @@ struct MenuBarView: View {
                     todayId: appState.todayDateString,
                     onOpenDay: openGitHubDay
                 )
-                .padding(.leading, graphLeadingCompensation)
+                .padding(.leading, Layout.graphLeadingCompensation)
                 Spacer(minLength: 0)
             }
         }
@@ -229,11 +238,11 @@ struct MenuBarView: View {
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity)
-        .padding(.bottom, 6)
+        .padding(.bottom, Layout.switcherBottomPadding)
     }
 
     private func header(totalContributions: Int) -> some View {
-        HStack(alignment: selectedPanel == .country ? .top : .center, spacing: 10) {
+        HStack(alignment: selectedPanel == .country ? .top : .center, spacing: Layout.controlSpacing) {
             headerTitle(totalContributions: totalContributions)
 
             if selectedPanel == .graph, let today = appState.todayContributions {
@@ -371,7 +380,7 @@ struct MenuBarView: View {
     }
 
     private var headerTrailingControls: some View {
-        HStack(spacing: trailingControlSpacing) {
+        HStack(spacing: Layout.controlSpacing) {
             if selectedPanel == .country {
                 countryPicker
             }
@@ -437,7 +446,7 @@ struct MenuBarView: View {
     }
 
     private var footerTrailingControls: some View {
-        HStack(spacing: trailingControlSpacing) {
+        HStack(spacing: Layout.controlSpacing) {
             if let syncStatusLabel = appState.syncStatusLabel {
                 Text(syncStatusLabel)
                     .font(.system(size: 9))
