@@ -135,9 +135,18 @@ final class AppState: ObservableObject {
         let lastUpdated: Date
     }
 
+    private struct CachedCountryLeaderboardState: Codable {
+        let username: String
+        let selectedCountrySlug: String
+        let selectedRange: ContributionRange
+        let snapshot: CountryLeaderboardSnapshot
+    }
+
     private enum PersistenceKeys {
         static let selectedRange = "selectedContributionRange"
         static let cachedState = "cachedContributionState"
+        static let selectedCountrySlug = "selectedCountrySlug"
+        static let cachedCountryLeaderboardState = "cachedCountryLeaderboardState"
         static let menuBarDisplayMode = "menuBarDisplayMode"
         static let automaticRefreshEnabled = "automaticRefreshEnabled"
         static let dailyReminderEnabled = "dailyReminderEnabled"
@@ -153,6 +162,10 @@ final class AppState: ObservableObject {
     @Published var lastUpdated: Date?
 
     @Published var selectedRange: ContributionRange = .last12Months
+    @Published var countryOptions: [CountryOption] = [.cambodia]
+    @Published var selectedCountrySlug = CountryOption.cambodia.slug
+    @Published var countryLeaderboard: CountryLeaderboardSnapshot?
+    @Published var countryLeaderboardStatus: CountryLeaderboardStatus = .idle
     @Published var menuBarDisplayMode: MenuBarDisplayMode = .todayCount
     @Published var automaticRefreshEnabled = true
     @Published var dailyReminderEnabled = false
@@ -161,9 +174,12 @@ final class AppState: ObservableObject {
 
     private let auth = GitHubAuth()
     private let service = GitHubService()
+    private let countryService = CountryLeaderboardService()
     private var token: String = ""
     private var authTask: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
+    private var countryOptionsTask: Task<Void, Never>?
+    private var countryLeaderboardTask: Task<Void, Never>?
     private var backgroundRefreshTask: Task<Void, Never>?
 
     // MARK: - Computed
@@ -184,6 +200,10 @@ final class AppState: ObservableObject {
         case .year(let year):
             return "in \(year)"
         }
+    }
+
+    var selectedCountryTitle: String {
+        countryOptions.first { $0.slug == selectedCountrySlug }?.title ?? CountryOption.cambodia.title
     }
 
     var selectedRangeTitle: String {
@@ -250,10 +270,12 @@ final class AppState: ObservableObject {
 
     init() {
         restorePersistedSelection()
+        restoreSelectedCountry()
         restoreMenuBarDisplayMode()
         restoreAutomaticRefreshPreference()
         restoreDailyReminderPreference()
         configureAutomaticRefreshLoop()
+        countryOptionsTask = Task { await loadCountryOptions() }
     }
 
     // MARK: - Auth
@@ -269,6 +291,8 @@ final class AppState: ObservableObject {
         token = ""
         username = ""
         calendar = nil
+        countryLeaderboard = nil
+        countryLeaderboardStatus = .idle
         lastUpdated = nil
         errorMessage = nil
         selectedRange = .last12Months
@@ -283,8 +307,20 @@ final class AppState: ObservableObject {
     func selectRange(_ range: ContributionRange) {
         guard selectedRange != range else { return }
         selectedRange = range
+        countryLeaderboard = nil
+        countryLeaderboardStatus = .idle
         persistSelectedRange()
         fetchContributions()
+        refreshCountryLeaderboardIfNeeded()
+    }
+
+    func selectCountry(_ slug: String) {
+        guard selectedCountrySlug != slug else { return }
+        selectedCountrySlug = slug
+        countryLeaderboard = nil
+        countryLeaderboardStatus = .idle
+        persistSelectedCountry()
+        refreshCountryLeaderboard()
     }
 
     func refreshContributions() {
@@ -294,6 +330,20 @@ final class AppState: ObservableObject {
     func refreshContributionsIfNeeded() {
         guard shouldRefreshOnOpen else { return }
         fetchContributions()
+    }
+
+    func refreshCountryLeaderboard() {
+        countryLeaderboardTask?.cancel()
+        countryLeaderboardTask = Task { await performCountryLeaderboardFetch() }
+    }
+
+    func refreshCountryLeaderboardIfNeeded() {
+        guard isLoggedIn else { return }
+        if countryLeaderboard == nil {
+            restoreCachedCountryLeaderboardIfAvailable(for: username)
+        }
+        guard countryLeaderboard == nil else { return }
+        refreshCountryLeaderboard()
     }
 
     func selectMenuBarDisplayMode(_ mode: MenuBarDisplayMode) {
@@ -348,6 +398,7 @@ final class AppState: ObservableObject {
             authStatus = .loggedIn
 
             restoreCachedStateIfAvailable(for: fetchedUsername)
+            restoreCachedCountryLeaderboardIfAvailable(for: fetchedUsername)
             await updateDailyReminderSchedule(requestAuthorizationIfNeeded: false)
             fetchContributions()
         } catch let error as AuthError {
@@ -397,6 +448,42 @@ final class AppState: ObservableObject {
         }
     }
 
+    private func performCountryLeaderboardFetch() async {
+        guard isLoggedIn else { return }
+
+        countryLeaderboardStatus = .loading
+
+        do {
+            let snapshot = try await countryService.fetchLeaderboard(
+                countrySlug: selectedCountrySlug,
+                range: selectedRange,
+                token: token
+            )
+            guard !Task.isCancelled else { return }
+            countryLeaderboard = snapshot
+            countryLeaderboardStatus = .loaded
+            persistCachedCountryLeaderboardState()
+        } catch {
+            guard !Task.isCancelled else { return }
+            countryLeaderboardStatus = .error(error.localizedDescription)
+        }
+    }
+
+    private func loadCountryOptions() async {
+        do {
+            let options = try await countryService.fetchCountryOptions()
+            guard !Task.isCancelled, !options.isEmpty else { return }
+            countryOptions = options
+            if !options.contains(where: { $0.slug == selectedCountrySlug }) {
+                selectedCountrySlug = CountryOption.cambodia.slug
+                persistSelectedCountry()
+            }
+        } catch {
+            guard !Task.isCancelled else { return }
+            countryOptions = [.cambodia]
+        }
+    }
+
     private func restorePersistedSelection() {
         guard
             let data = UserDefaults.standard.data(forKey: PersistenceKeys.selectedRange),
@@ -413,6 +500,18 @@ final class AppState: ObservableObject {
         UserDefaults.standard.set(data, forKey: PersistenceKeys.selectedRange)
     }
 
+    private func restoreSelectedCountry() {
+        guard let slug = UserDefaults.standard.string(forKey: PersistenceKeys.selectedCountrySlug), !slug.isEmpty else {
+            return
+        }
+
+        selectedCountrySlug = slug
+    }
+
+    private func persistSelectedCountry() {
+        UserDefaults.standard.set(selectedCountrySlug, forKey: PersistenceKeys.selectedCountrySlug)
+    }
+
     private func restoreCachedStateIfAvailable(for username: String) {
         guard
             let data = UserDefaults.standard.data(forKey: PersistenceKeys.cachedState),
@@ -425,6 +524,21 @@ final class AppState: ObservableObject {
 
         calendar = cached.calendar
         lastUpdated = cached.lastUpdated
+    }
+
+    private func restoreCachedCountryLeaderboardIfAvailable(for username: String) {
+        guard
+            let data = UserDefaults.standard.data(forKey: PersistenceKeys.cachedCountryLeaderboardState),
+            let cached = try? JSONDecoder().decode(CachedCountryLeaderboardState.self, from: data),
+            cached.username == username,
+            cached.selectedCountrySlug == selectedCountrySlug,
+            cached.selectedRange == selectedRange
+        else {
+            return
+        }
+
+        countryLeaderboard = cached.snapshot
+        countryLeaderboardStatus = .loaded
     }
 
     private func restoreMenuBarDisplayMode() {
@@ -469,8 +583,24 @@ final class AppState: ObservableObject {
         persistSelectedRange()
     }
 
+    private func persistCachedCountryLeaderboardState() {
+        guard let countryLeaderboard else { return }
+
+        let cached = CachedCountryLeaderboardState(
+            username: username,
+            selectedCountrySlug: selectedCountrySlug,
+            selectedRange: selectedRange,
+            snapshot: countryLeaderboard
+        )
+
+        guard let data = try? JSONEncoder().encode(cached) else { return }
+        UserDefaults.standard.set(data, forKey: PersistenceKeys.cachedCountryLeaderboardState)
+        persistSelectedCountry()
+    }
+
     private func clearPersistedState() {
         UserDefaults.standard.removeObject(forKey: PersistenceKeys.cachedState)
+        UserDefaults.standard.removeObject(forKey: PersistenceKeys.cachedCountryLeaderboardState)
         UserDefaults.standard.removeObject(forKey: PersistenceKeys.selectedRange)
     }
 

@@ -181,6 +181,7 @@ struct MenuBarView: View {
                 .padding(.leading, graphLeadingCompensation)
                 Spacer(minLength: 0)
             }
+            CountryLeaderboardView(appState: appState)
             footer
         }
         .padding(.top, contentVerticalInset)
