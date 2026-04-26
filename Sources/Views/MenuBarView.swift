@@ -181,9 +181,10 @@ struct MenuBarView: View {
     // MARK: - Contribution View
 
     private func contributionView(_ calendar: ContributionCalendar) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: selectedPanel == .country ? 14 : 10) {
             panelSwitcherBar
             header(totalContributions: calendar.totalContributions)
+                .padding(.bottom, selectedPanel == .country ? 6 : 0)
 
             switch selectedPanel {
             case .graph:
@@ -232,7 +233,7 @@ struct MenuBarView: View {
     }
 
     private func header(totalContributions: Int) -> some View {
-        HStack(alignment: .center, spacing: 10) {
+        HStack(alignment: selectedPanel == .country ? .top : .center, spacing: 10) {
             headerTitle(totalContributions: totalContributions)
 
             if selectedPanel == .graph, let today = appState.todayContributions {
@@ -254,7 +255,7 @@ struct MenuBarView: View {
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.secondary)
         case .country:
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 5) {
                 Label("Country preview", systemImage: "flag.checkered")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.primary)
