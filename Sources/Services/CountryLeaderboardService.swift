@@ -130,19 +130,39 @@ final class CountryLeaderboardService {
             throw CountryLeaderboardError.httpError(statusCode: http.statusCode)
         }
 
-        let decoded = try JSONDecoder().decode(CountryGraphQLResponse.self, from: data)
-        guard let data = decoded.data else {
-            if let errors = decoded.errors, !errors.isEmpty {
-                throw CountryLeaderboardError.graphQL(errors.map(\.message).joined(separator: ", "))
-            }
-            return [:]
+        return try parseContributionTotals(data: data, usernames: safeUsernames)
+    }
+
+    private func parseContributionTotals(data: Data, usernames: [String]) throws -> [String: Int] {
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw CountryLeaderboardError.invalidResponse
+        }
+
+        if let errors = root["errors"] as? [[String: Any]], !errors.isEmpty, root["data"] == nil {
+            let message = errors.compactMap { $0["message"] as? String }.joined(separator: ", ")
+            throw CountryLeaderboardError.graphQL(message.isEmpty ? "Unknown GraphQL error" : message)
+        }
+
+        guard let data = root["data"] as? [String: Any] else {
+            throw CountryLeaderboardError.invalidResponse
         }
 
         var totals: [String: Int] = [:]
-        for (index, username) in safeUsernames.enumerated() {
+        totals.reserveCapacity(usernames.count)
+
+        for (index, username) in usernames.enumerated() {
             let alias = "u\(index)"
-            guard let user = data[alias] ?? nil else { continue }
-            totals[username.lowercased()] = user.contributionsCollection.contributionCalendar.totalContributions
+            guard
+                let user = data[alias] as? [String: Any],
+                let contributionsCollection = user["contributionsCollection"] as? [String: Any],
+                let calendar = contributionsCollection["contributionCalendar"] as? [String: Any],
+                let total = calendar["totalContributions"] as? Int
+            else {
+                totals[username.lowercased()] = 0
+                continue
+            }
+
+            totals[username.lowercased()] = total
         }
 
         return totals
@@ -230,15 +250,6 @@ final class CountryLeaderboardService {
         formatter.formatOptions = [.withInternetDateTime]
         return formatter.string(from: date)
     }
-}
-
-private struct CountryGraphQLResponse: Codable {
-    let data: [String: CountryGraphQLUser?]?
-    let errors: [GraphQLError]?
-}
-
-private struct CountryGraphQLUser: Codable {
-    let contributionsCollection: ContributionsCollection
 }
 
 enum CountryLeaderboardError: LocalizedError {
