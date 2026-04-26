@@ -30,21 +30,27 @@ final class CountryLeaderboardService {
         countrySlug: String,
         range: ContributionRange,
         token: String,
-        limit: Int = 256
+        limit: Int = 5,
+        includeUsername: String? = nil
     ) async throws -> CountryLeaderboardSnapshot {
         let country = try await fetchCountryPayload(slug: countrySlug)
-        let usernames = Array(country.user.prefix(limit))
+        let sourceRanks = Dictionary(uniqueKeysWithValues: country.user.enumerated().map { ($0.element.lowercased(), $0.offset + 1) })
+        let usernames = leaderboardUsernames(
+            from: country.user,
+            limit: limit,
+            includeUsername: includeUsername
+        )
         let contributions = try await fetchContributionTotals(
             usernames: usernames,
             range: range,
             token: token
         )
 
-        let entries = usernames.enumerated().map { index, username in
+        let entries = usernames.map { username in
             CountryLeaderboardEntry(
                 username: username,
                 contributions: contributions[username.lowercased()] ?? 0,
-                sourceRank: index + 1,
+                sourceRank: sourceRanks[username.lowercased()] ?? Int.max,
                 countrySlug: countrySlug,
                 countryTitle: country.title
             )
@@ -61,8 +67,29 @@ final class CountryLeaderboardService {
             countryTitle: country.title,
             range: range,
             entries: entries,
+            seedUserCount: country.user.count,
+            fetchedUserCount: usernames.count,
             lastUpdated: Date()
         )
+    }
+
+    private func leaderboardUsernames(
+        from usernames: [String],
+        limit: Int,
+        includeUsername: String?
+    ) -> [String] {
+        var selected = Array(usernames.prefix(max(1, limit)))
+
+        guard
+            let includeUsername,
+            !selected.contains(where: { $0.caseInsensitiveCompare(includeUsername) == .orderedSame }),
+            let matchedUsername = usernames.first(where: { $0.caseInsensitiveCompare(includeUsername) == .orderedSame })
+        else {
+            return selected
+        }
+
+        selected.append(matchedUsername)
+        return selected
     }
 
     private func fetchCountryPayload(slug: String) async throws -> CommittersTopCountryPayload {

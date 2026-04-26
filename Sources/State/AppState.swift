@@ -457,7 +457,8 @@ final class AppState: ObservableObject {
             let snapshot = try await countryService.fetchLeaderboard(
                 countrySlug: selectedCountrySlug,
                 range: selectedRange,
-                token: token
+                token: token,
+                includeUsername: username
             )
             guard !Task.isCancelled else { return }
             countryLeaderboard = snapshot

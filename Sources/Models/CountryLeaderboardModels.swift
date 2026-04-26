@@ -42,7 +42,13 @@ struct CountryLeaderboardSnapshot: Codable, Equatable {
     let countryTitle: String
     let range: ContributionRange
     let entries: [CountryLeaderboardEntry]
+    let seedUserCount: Int
+    let fetchedUserCount: Int
     let lastUpdated: Date
+
+    var isComplete: Bool {
+        fetchedUserCount >= seedUserCount
+    }
 
     func rank(for username: String) -> Int? {
         entries.firstIndex { $0.username.caseInsensitiveCompare(username) == .orderedSame }.map { $0 + 1 }

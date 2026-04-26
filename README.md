@@ -40,7 +40,7 @@ gh auth login
 - **Insight chips** — current streak, trailing 7-day total, week-over-week delta, best day, average/day, and longest streak
 - **Hover details + quick open** — hover any square for count + date, then click to open that day on GitHub
 - **Today highlighted** — today's cell has a distinct border + green badge
-- **Country leaderboard** — rank your selected country using committers.top seed lists and GitHub GraphQL totals
+- **Country leaderboard preview** — quickly compare the top 5 seed users and your account using committers.top seed lists and GitHub GraphQL totals
 - **Zero config** — uses `gh auth token`, no tokens to paste
 - **Menu bar only** — no dock icon, lightweight
 - **Cached last view** — restores your last successful graph instantly on relaunch
@@ -61,7 +61,7 @@ Or open in Xcode: `make open` → `Cmd + R`.
 2. Fetches your username from the GitHub REST API
 3. Fetches your contribution calendar via GraphQL (parameterized queries)
 4. Renders the grid in a native macOS menu bar popover
-5. Loads country seed lists from committers.top and batches GitHub GraphQL contribution totals for leaderboard ranking
+5. Loads country seed lists from committers.top and batches GitHub GraphQL contribution totals for a fast top-5 leaderboard preview
 6. Shows today's count in the menu bar label
 
 If `gh` isn't installed or you're not logged in, the app shows the exact commands to run with copy buttons.

@@ -135,7 +135,7 @@ struct CountryLeaderboardView: View {
 
         return HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Your rank")
+                Text(snapshot.isComplete ? "Your rank" : "Preview rank")
                     .font(.system(size: 9))
                     .foregroundStyle(.tertiary)
 
@@ -222,7 +222,7 @@ struct CountryLeaderboardView: View {
 
     private func footer(_ snapshot: CountryLeaderboardSnapshot) -> some View {
         HStack(spacing: 4) {
-            Text("Seeded by committers.top · top \(snapshot.entries.count) users")
+            Text(footerSummary(snapshot))
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
 
@@ -232,6 +232,14 @@ struct CountryLeaderboardView: View {
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
         }
+    }
+
+    private func footerSummary(_ snapshot: CountryLeaderboardSnapshot) -> String {
+        if snapshot.isComplete {
+            return "Seeded by committers.top · \(snapshot.entries.count) users"
+        }
+
+        return "Fast preview · fetched \(snapshot.fetchedUserCount) of \(snapshot.seedUserCount) seed users"
     }
 
     private var selectedCountryBinding: Binding<String> {
