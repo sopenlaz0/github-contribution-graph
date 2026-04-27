@@ -40,6 +40,29 @@ brew install gh
 gh auth login
 ```
 
+## Install with your AI agent
+
+Copy this prompt into Codex, Claude Code, Cursor, or any local coding agent to have it install the app for you:
+
+```txt
+You are my local macOS coding agent. Install the GitHub Contributions menu bar app for me.
+
+Repository: https://github.com/sopenlaz0/github-contribution-graph
+
+Please do the following safely:
+1. Check that this is macOS and that Xcode Command Line Tools are available.
+2. Install missing prerequisites with Homebrew if needed: gh and xcodegen.
+3. Run `gh auth status`. If GitHub CLI is not logged in, help me run `gh auth login` and wait for me to complete the browser flow. Never print or store my GitHub token.
+4. Clone the repo into `~/Developer/github-contribution-graph` if it does not exist. If it already exists, pull the latest `main`.
+5. Run `make setup`.
+6. Run `make release`.
+7. Install the app with `make install`. If copying to `/Applications` requires elevated permissions, ask me before using sudo.
+8. Clear quarantine with `xattr -cr /Applications/GitHubContributions.app`.
+9. Open `/Applications/GitHubContributions.app` and confirm the menu bar icon appears.
+
+When done, summarize the installed app path and any checks you ran.
+```
+
 ## Features
 
 - **Today's count in the menu bar** — see your number without clicking
