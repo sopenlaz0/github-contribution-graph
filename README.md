@@ -1,8 +1,10 @@
 # GitHub Contributions
 
-A minimal macOS menu bar app that shows your GitHub contribution graph. Glance at the menu bar to see today's count. Click to see the full grid.
+A minimal macOS menu bar app that shows your GitHub contribution graph, streak stats, and country leaderboard preview. Glance at the menu bar to see today's count. Click to see the full grid.
 
 **Zero config** — uses your existing `gh` CLI login. No tokens, no OAuth apps.
+
+**Keywords:** macOS menu bar, SwiftUI, GitHub contributions, contribution graph, GitHub streaks, GitHub leaderboard, GitHub GraphQL API.
 
 ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue)
 ![Swift 5.9](https://img.shields.io/badge/Swift-5.9-orange)
