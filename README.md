@@ -9,6 +9,16 @@ A minimal macOS menu bar app that shows your GitHub contribution graph. Glance a
 ![SwiftUI](https://img.shields.io/badge/SwiftUI-MenuBarExtra-green)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
+## Screenshots
+
+### Contribution graph
+
+![GitHub Contributions graph panel](docs/screenshots/graph-panel.png)
+
+### Country leaderboard preview
+
+![GitHub Contributions country leaderboard panel](docs/screenshots/country-panel.png)
+
 ## Download & Install
 
 1. Grab the latest `.dmg` or `.zip` from [Releases](../../releases)
